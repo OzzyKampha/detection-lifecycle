@@ -207,6 +207,7 @@ td.num{font-variant-numeric:tabular-nums}
 .mf input,.mf select,.filters input,.filters select{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;font-size:.95rem;width:100%}
 .mf small{color:var(--muted);font-size:.82rem}
 .mf small.bad{color:var(--l1)}
+.mf .optional{font-weight:400;color:var(--muted)}
 .tactics{display:flex;flex-wrap:wrap;gap:6px}
 .tac{background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:.85rem}
 .tac[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -657,7 +658,7 @@ const SOURCE_HELP={
   'Coverage gap':'Our own review found a technique we do not cover',
   'Other':'Anything else, explain in the notes'};
 const MEASURED=['coverage','confidence','noise','cost'];   // criteria Testing can actually measure
-const metaOf=(d)=>d.meta||(d.meta={source:'',owner:'',techniques:'',dataSources:'',tactics:[]});
+const metaOf=(d)=>d.meta||(d.meta={source:'',owner:'',requestedBy:'',reference:'',techniques:'',dataSources:'',tactics:[]});
 const splitList=(str)=>(str||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
 const TECH_RE=/^T\d{4}(\.\d{3})?$/;
 const techs=(d)=>splitList(metaOf(d).techniques).map(x=>x.toUpperCase());
@@ -680,10 +681,10 @@ const DEV = IDX.dev, TEST = IDX.test, DEPLOY = IDX.deploy, DEPR = IDX.depr, LAST
 const DEPR_REASONS=['Replaced by a better detection','Threat no longer relevant','Data source retired','Too noisy to tune','Platform or schema change','Other'];
 
 let uid = 0;
-function isBlank(d){ return !d.name.trim()&&!Object.keys(d.scores.prio).length&&!Object.keys(d.scores.triage).length&&!d.stage&&!d.deployed&&!metaOf(d).owner&&!metaOf(d).tactics.length&&!metaOf(d).techniques; }
+function isBlank(d){ return !d.name.trim()&&!Object.keys(d.scores.prio).length&&!Object.keys(d.scores.triage).length&&!d.stage&&!d.deployed&&!metaOf(d).owner&&!metaOf(d).requestedBy&&!metaOf(d).reference&&!metaOf(d).tactics.length&&!metaOf(d).techniques; }
 function newUid(){ const a=new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a,b=>b.toString(16).padStart(2,'0')).join(''); }
 function newDetection(name=''){
-  return {id:++uid,uid:newUid(),updatedAt:null,updatedBy:'',baseAt:'',name,stage:0,deployed:false,rule:'',reviewedAt:null,reviews:[],cadence:null,deprecated:false,deprecatedAt:null,depr:{reason:'',replacement:''},indicator:null,gapNotes:{},created:new Date().toISOString(),enteredAt:Date.now(),spent:{},dates:{},deployedAt:null,measured:{},meta:{source:'',owner:'',techniques:'',dataSources:'',tactics:[]},scores:{triage:{},prio:{}},checks:{},notes:{},loops:0};
+  return {id:++uid,uid:newUid(),updatedAt:null,updatedBy:'',baseAt:'',name,stage:0,deployed:false,rule:'',reviewedAt:null,reviews:[],cadence:null,deprecated:false,deprecatedAt:null,depr:{reason:'',replacement:''},indicator:null,gapNotes:{},created:new Date().toISOString(),enteredAt:Date.now(),spent:{},dates:{},deployedAt:null,measured:{},meta:{source:'',owner:'',requestedBy:'',reference:'',techniques:'',dataSources:'',tactics:[]},scores:{triage:{},prio:{}},checks:{},notes:{},loops:0};
 }
 const state = {screen:'overview',tombs:[],dets:[newDetection()],cur:0,view:0,tab:'pipe',settings:{gates:true,cadence:90,showDep:true,me:'',lastShared:''}};
 const $ = (id)=>document.getElementById(id);
@@ -873,6 +874,8 @@ function renderStage(){
           <small id="srcHelp">${m.source?SOURCE_HELP[m.source]:'Why we need this detection in the first place'}</small></div>
         <div class="mf"><label for="m-created">Requested on</label><input id="m-created" type="date" data-date="created" value="${d.created.slice(0,10)}"></div>
         <div class="mf"><label for="m-owner">Owner</label><input id="m-owner" data-m="owner" type="text" placeholder="Who drives this detection" value="${esc(m.owner)}"></div>
+        <div class="mf"><label for="m-reqby">Requested by <span class="optional">(optional)</span></label><input id="m-reqby" data-m="requestedBy" type="text" placeholder="Who asked for it" value="${esc(m.requestedBy)}"><small>Who to tell when it ships, is parked or is retired</small></div>
+        <div class="mf full"><label for="m-ref">Context or reference <span class="optional">(optional)</span></label><input id="m-ref" data-m="reference" type="text" placeholder="Ticket, incident, intel report or control ID" value="${esc(m.reference)}"><small>Why this is needed, so later reviews can tell if it still is</small></div>
         <div class="mf full"><span class="lab" id="tac-l">Tactics</span><div class="tactics" role="group" aria-labelledby="tac-l">${TACTICS.map(([id,n])=>`<button class="tac" data-tac="${id}" aria-pressed="${m.tactics.includes(id)}">${n}</button>`).join('')}</div></div>
         <div class="mf"><label for="m-tech">ATT&amp;CK technique IDs</label><input id="m-tech" data-m="techniques" type="text" placeholder="T1003.001, T1558.003" value="${esc(m.techniques)}">
           <small id="techHint" class="${bad.length?'bad':''}">${bad.length?`Not a technique ID: ${esc(bad.join(', '))}`:'Comma separated, e.g. T1003 or T1003.001'}</small></div>
@@ -1080,7 +1083,7 @@ function matches(d){
   if($('fMine').checked && state.settings.me && m.owner.trim().toLowerCase()!==state.settings.me.toLowerCase()) return false;
   if(tac && !m.tactics.includes(tac)) return false;
   if(own && m.owner.trim()!==own) return false;
-  if(q && ![label(d),m.techniques,m.dataSources,m.owner,d.rule].join(' ').toLowerCase().includes(q)) return false;
+  if(q && ![label(d),m.techniques,m.dataSources,m.owner,m.requestedBy,m.reference,d.rule].join(' ').toLowerCase().includes(q)) return false;
   return true;
 }
 function renderMine(){
@@ -1278,7 +1281,7 @@ function describeChanges(a,b){
   if(JSON.stringify(a.gapNotes||{})!==JSON.stringify(b.gapNotes||{})) T('gapnotes','log source notes');
   for(const st of STAGES) if(((a.notes||{})[st.id]||'')!==((b.notes||{})[st.id]||'')) T(`n.${st.id}`,`${st.name} notes`);
   const ma=a.meta||{}, mb=b.meta||{};
-  [['owner','Owner'],['source','Trigger'],['techniques','Techniques'],['dataSources','Data sources']].forEach(([k,l])=>{ if((ma[k]||'')!==(mb[k]||'')) V(`meta.${k}`,l,ma[k],mb[k]); });
+  [['owner','Owner'],['requestedBy','Requested by'],['source','Trigger'],['reference','Context or reference'],['techniques','Techniques'],['dataSources','Data sources']].forEach(([k,l])=>{ if((ma[k]||'')!==(mb[k]||'')) V(`meta.${k}`,l,ma[k],mb[k]); });
   const tn=(arr)=>(arr||[]).map(id=>(TACTICS.find(t=>t[0]===id)||[0,id])[1]);
   if(JSON.stringify(ma.tactics||[])!==JSON.stringify(mb.tactics||[])) V('meta.tactics','Tactics',tn(ma.tactics),tn(mb.tactics));
   if(a.indicator!==b.indicator) V('indicator','Indicator type',(INDICATORS.find(x=>x.id===a.indicator)||{}).name,(INDICATORS.find(x=>x.id===b.indicator)||{}).name);
@@ -1339,7 +1342,7 @@ function save(){
 window.addEventListener('pagehide',()=>{ if(save.t) saveNow(); });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden && save.t) saveNow(); });
 function setStatus(msg,bad){ const el=$('saveStatus'); el.textContent=msg; el.classList.toggle('bad',!!bad); }
-function hydrate(list){ const out=list.map(d=>{const n={...newDetection(),...d}; if(!d.uid) n.uid=newUid(); n.updatedAt=n.updatedAt||n.created||new Date().toISOString(); n.updatedBy=n.updatedBy||''; n.baseAt=n.baseAt||''; if(!n.id||list.filter(x=>x.id===n.id).length>1) n.id=++uid; uid=Math.max(uid,n.id); n.gapNotes=n.gapNotes||{}; n.measured=n.measured||{}; n.meta={source:'',owner:'',techniques:'',dataSources:'',tactics:[],...(n.meta||{})}; n.stage=Math.min(n.stage||0,LAST); n.created=n.created||new Date().toISOString(); n.enteredAt=n.enteredAt||Date.now(); n.spent=n.spent||{}; n.dates=n.dates||{}; n.depr={reason:'',replacement:'',...(n.depr||{})}; n.reviews=(n.reviews||[]).map(r=>typeof r==='string'?{at:r}:r); n.rule=n.rule||''; if(n.deployed&&!n.reviewedAt) n.reviewedAt=n.deployedAt; return n;});
+function hydrate(list){ const out=list.map(d=>{const n={...newDetection(),...d}; if(!d.uid) n.uid=newUid(); n.updatedAt=n.updatedAt||n.created||new Date().toISOString(); n.updatedBy=n.updatedBy||''; n.baseAt=n.baseAt||''; if(!n.id||list.filter(x=>x.id===n.id).length>1) n.id=++uid; uid=Math.max(uid,n.id); n.gapNotes=n.gapNotes||{}; n.measured=n.measured||{}; n.meta={source:'',owner:'',requestedBy:'',reference:'',techniques:'',dataSources:'',tactics:[],...(n.meta||{})}; n.stage=Math.min(n.stage||0,LAST); n.created=n.created||new Date().toISOString(); n.enteredAt=n.enteredAt||Date.now(); n.spent=n.spent||{}; n.dates=n.dates||{}; n.depr={reason:'',replacement:'',...(n.depr||{})}; n.reviews=(n.reviews||[]).map(r=>typeof r==='string'?{at:r}:r); n.rule=n.rule||''; if(n.deployed&&!n.reviewedAt) n.reviewedAt=n.deployedAt; return n;});
   out.forEach(n=>{ const r=n.depr.replacement; if(r && !out.some(x=>x.uid===String(r))){ const m=out.find(x=>String(x.id)===String(r)); n.depr.replacement=m?m.uid:''; } });
   return out; }
 function load(){
@@ -1371,7 +1374,7 @@ function buildSummary(d){
   const para=(txt)=>{ H.push(`<p>${esc(txt)}</p>`); M.push(txt); };
   H.push(`<h1>${esc(label(d))}</h1>`); M.push(`# ${label(d)}`);
   const u=safeUrl(d.rule);
-  row('Stage',stageLabel(d)); row('Next action',`${a.label}. ${a.why}`); row('Owner',m.owner); row('Trigger',m.source);
+  row('Stage',stageLabel(d)); row('Next action',`${a.label}. ${a.why}`); row('Owner',m.owner); row('Requested by',m.requestedBy); row('Trigger',m.source); row('Context or reference',m.reference);
   row('Requested on',fmtDate(d.created)); if(d.rule) row('Rule',u?{html:`<a href="${esc(u)}">${esc(u)}</a>`,md:u}:d.rule);
   if(m.tactics.length||techs(d).length||splitList(m.dataSources).length||indOf(d)) sec('Scope');
   row('Tactics',m.tactics.map(id=>(TACTICS.find(x=>x[0]===id)||[0,id])[1]).join(', ')); row('Techniques',techs(d).join(', '));
@@ -1461,7 +1464,7 @@ function exampleSet(){
     checks:{invest:['partial',true,true,true,true,true,true,true,true],dev:[true,true,false,false,false,false]},
     gapNotes:{0:'Elastic Defend on about 70% of internet-facing IIS servers'}},18,[['req',2],['triage',1],['invest',4]],'dev'));
   L.push(path({uid:'ex-ransom',name:'Mass file renames on file shares',scores:{prio:{coverage:3,durability:3,complexity:2},triage:{}},
-    meta:meta('Incident','Priya',['TA0040'],'T1486','Windows file share auditing'),
+    meta:{...meta('Incident','Priya',['TA0040'],'T1486','Windows file share auditing'),requestedBy:'Incident response lead, Kari',reference:'TTX-2026-03 finding 4: mass renames on a file share went unnoticed in the ransomware tabletop'},
     notes:{req:'Raised after the ransomware tabletop exercise. Needs volume baselines per share.'}},3,[],'req'));
   return L.map(d=>({...d,example:true,updatedBy:'Example',updatedAt:d.created,reviewedAt:d.reviews&&d.reviews.length?d.reviews[d.reviews.length-1].at:undefined}));
 }
@@ -1711,7 +1714,7 @@ $('pipeBody').addEventListener('click',e=>{
 });
 
 const HEAD=['Detection','Stage','Next action','Prioritization','Prioritization tier','Triage','Triage tier','Indicator type','Owner','Techniques','Current stage progress',
-  'Trigger','Tactics','Data sources','Measured prioritization','Measured tier','Data gaps','Created','Deployed','Days to deploy','Last reviewed','Next review','Last review alerts','Last review true positives','Last test','Rule link','Deprecated','Deprecation reason','Replaced by',
+  'Trigger','Requested by','Context or reference','Tactics','Data sources','Measured prioritization','Measured tier','Data gaps','Created','Deployed','Days to deploy','Last reviewed','Next review','Last review alerts','Last review true positives','Last test','Rule link','Deprecated','Deprecation reason','Replaced by',
   ...STAGES.map(x=>`Days in ${x.name}`),'Notes'];
 const MD_COLS=[0,2,1,3,5,8,9,10];
 function rows(){
@@ -1722,7 +1725,7 @@ function rows(){
     indOf(d)?indOf(d).name:'',
     m.owner, techs(d).join(', '),
     stageProgress(d),
-    m.source, m.tactics.map(id=>TACTICS.find(x=>x[0]===id)[1]).join(', '), splitList(m.dataSources).join(', '),
+    m.source, m.requestedBy, m.reference, m.tactics.map(id=>TACTICS.find(x=>x[0]===id)[1]).join(', '), splitList(m.dataSources).join(', '),
     a&&a.complete?`${a.total}/${a.max}`:'', a&&a.tier?a.tier.name:'',
     gapsOf(d).map(g=>g.note?`${g.label}: ${g.note}`:g.label).join(' | '),
     d.created.slice(0,10), d.deployedAt?d.deployedAt.slice(0,10):'', d.deployedAt?Math.round((new Date(d.deployedAt)-new Date(d.created))/DAY):'',
@@ -1854,6 +1857,8 @@ const CSV_FIELDS={
   tactics:['tactics','tactic'],
   dataSources:['datasources','datasource','logsources'],
   source:['trigger','requestsource','source'],
+  requestedBy:['requestedby','requester','requestor'],
+  reference:['contextorreference','reference','context','ticket','ref'],
   created:['created','requested','requestedon','createdon'],
   deployedAt:['deployed','deployedon','deploydate'],
   reviewedAt:['lastreviewed','reviewed','reviewedon'],
@@ -1874,7 +1879,7 @@ function importCSV(text){
     const name=get('name'); if(!name){ skipped++; return; }
     if(existing.has(name.toLowerCase())){ dupes++; return; }
     const d=newDetection(name), m=metaOf(d); d.rule=get('rule');
-    m.owner=get('owner'); m.techniques=get('techniques'); m.dataSources=get('dataSources');
+    m.owner=get('owner'); m.requestedBy=get('requestedBy'); m.reference=get('reference'); m.techniques=get('techniques'); m.dataSources=get('dataSources');
     const src=get('source'); if(src) m.source=SOURCES.find(x=>norm(x)===norm(src))||'Other';
     m.tactics=splitList(get('tactics').replace(/\|/g,',')).map(t=>(TACTICS.find(([id,n])=>norm(id)===norm(t)||norm(n)===norm(t))||[])[0]).filter(Boolean);
     const created=csvDate(get('created')); if(created) d.created=created;
@@ -1902,9 +1907,9 @@ $('csvIn').addEventListener('change',async e=>{
   flash(`Imported ${r.added} detection${r.added===1?'':'s'}${extra?` (${extra}, skipped)`:''}. Scores are not imported, so score them when you pick them up.`,9000);
 });
 $('csvTemplate').addEventListener('click',()=>{
-  const rows=[['Name','Owner','Stage','Techniques','Tactics','Data sources','Trigger','Created','Deployed','Last reviewed'],
-    ['LSASS access by unsigned process','Åsmund','Deployed','T1003.001','Credential Access','Sysmon, Elastic Defend','Threat intel','2026-03-02','2026-03-20','2026-08-15'],
-    ['Kerberoasting RC4 tickets','Kari','Investigation','T1558.003','Credential Access','Windows Security','Red or purple team','2026-09-10','','']];
+  const rows=[['Name','Owner','Stage','Techniques','Tactics','Data sources','Trigger','Requested by','Reference','Created','Deployed','Last reviewed'],
+    ['LSASS access by unsigned process','Åsmund','Deployed','T1003.001','Credential Access','Sysmon, Elastic Defend','Threat intel','','','2026-03-02','2026-03-20','2026-08-15'],
+    ['Kerberoasting RC4 tickets','Kari','Investigation','T1558.003','Credential Access','Windows Security','Red or purple team','Purple team','PT-2026-09 finding 3','2026-09-10','','']];
   download('detection-import-template.csv','text/csv',rows.map(r=>r.map(v=>`"${v.replace(/"/g,'""')}"`).join(',')).join('\n'));
 });
 $('fileIn').addEventListener('change',async e=>{
