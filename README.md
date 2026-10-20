@@ -26,6 +26,8 @@ Each detection moves through six stages, with an optional seventh at the end:
 
 The overview has four views. **Pipeline** lists every detection with its next action, ranked so the most urgent work comes first. **ATT&CK coverage** shows which tactics and techniques your detections cover. **Data gaps** collects every missing or partial log source across all detections, ranked by how much they hold back. **Prediction check** compares the scores given at the start with what testing and production actually showed.
 
+Requirements Discovery also has two optional fields: **Requested by**, so you know who to tell when the rule ships, is parked or is retired, and **Context or reference**, for the ticket, incident, intel report or control ID behind the request. Both are searchable and appear in the exports and the summary.
+
 Every detection also has a change history and a one-page summary that can be copied as Markdown or printed to PDF.
 
 ## The two scores
@@ -101,6 +103,8 @@ Headers are matched loosely. These are recognised:
 | Tactics | Tactics, Tactic (names or TA IDs) |
 | Data sources | Data sources, Log sources |
 | Trigger | Trigger, Request source, Source |
+| Requested by | Requested by, Requester, Requestor |
+| Context or reference | Context or reference, Reference, Context, Ticket, Ref |
 | Rule link | Rule link, Rule ID, Link, URL |
 | Dates | Created, Deployed, Last reviewed, Deprecated |
 
