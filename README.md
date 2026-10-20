@@ -4,6 +4,12 @@ A single-page tool for taking detections from first requirement to production, a
 
 **Open the tool:** `https://<your-username>.github.io/<repository-name>/`
 
+## Try it with example data
+
+Open the tool and select **try it with example data** in the empty pipeline, or choose **Share and export → Load example data**. It loads ten made-up detections that show every part of the tool: one in each stage, a rule with a data gap and partial coverage, a test that came out noisier than predicted, a live rule drowning in false positives, an overdue review, a threat parked in triage, a noisy idea held back by a gate, and a deprecated rule with its replacement.
+
+Example detections are marked **Example**, stay in your browser, and are never included in the shared file. Remove them at any time with **Remove example data**.
+
 ## What it does
 
 Each detection moves through six stages, with an optional seventh at the end:

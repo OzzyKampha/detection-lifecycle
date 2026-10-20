@@ -234,6 +234,10 @@ td.num{font-variant-numeric:tabular-nums}
 .cal-row h3{margin:0;font-size:1.05rem;font-weight:600}
 .cal-row p{margin:0}
 .section{margin-top:64px}
+.ex-pill{font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:999px;border:1.5px dashed var(--muted);color:var(--muted);white-space:nowrap;vertical-align:1px}
+.ex-banner[hidden]{display:none}
+td[data-l="Next action"] .na{white-space:normal;display:inline-block;max-width:150px}
+.ex-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1.5px dashed var(--muted);border-radius:10px;font-size:.93rem}
 .dh-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .history{margin-top:40px;border-top:1.5px solid var(--line);padding-top:14px}
 .history summary{cursor:pointer;font-family:"Familjen Grotesk",system-ui,sans-serif;font-weight:600;font-size:1.1rem}
@@ -445,6 +449,8 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
           <button id="dlCsv">Download pipeline as CSV</button>
           <button id="copyGaps">Copy data gaps as Markdown</button>
           <hr>
+          <button id="exToggle">Load example data</button>
+          <hr>
           <button id="importCsv">Import detections (CSV)</button>
           <button id="csvTemplate">Download CSV import template</button>
           <hr>
@@ -458,6 +464,7 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
     </div>
 
     <p class="hint ov-hint" role="status"></p>
+    <div class="ex-banner" id="exBanner" hidden><span><b>Example data is loaded.</b> It is made up, stays in this browser, and is never included in the shared file.</span><button type="button" class="btn ghost" id="exRemove">Remove example data</button></div>
     <div class="merge-report" id="mergeReport" hidden></div>
     <div class="tp" role="tabpanel" id="p-pipe" aria-labelledby="t-pipe">
       <p class="sub" id="pipeSub">Ranked by next action, then prioritization and triage scores.</p>
@@ -1129,14 +1136,14 @@ function renderPipeline(){
   const pcell=(d,r)=>{ if(!r.complete) return cell(r); const a=adjusted(d);
     return (a&&a.complete&&a.total!==r.total)?tierBox(a,`Score ${a.total}/${a.max} after testing, predicted ${r.total}`):cell(r); };
   const list=sorted().filter(x=>!isBlank(x.d)&&matches(x.d));
-  $('pipeBody').innerHTML=(list.length?'':`<tr class="empty-row"><td colspan="7">${state.dets.some(d=>!isBlank(d))?'No detections match these filters.':'No detections yet. Select New detection, or import a CSV from Share and export.'}</td></tr>`)+list.map(({d,i,p,t})=>{
+  $('pipeBody').innerHTML=(list.length?'':`<tr class="empty-row"><td colspan="7">${state.dets.some(d=>!isBlank(d))?'No detections match these filters.':'No detections yet. Select New detection, import a CSV from Share and export, or <button type="button" class="linkbtn" data-load-examples>try it with example data</button>.'}</td></tr>`)+list.map(({d,i,p,t})=>{
     return `<tr class="${i===state.cur?'active':''} ${d.deprecated?'dep':''}">
-      <td data-l="Detection">${hl(label(d))}${(()=>{const m=metaOf(d), ds=splitList(m.dataSources), tc=techs(d);
+      <td data-l="Detection">${hl(label(d))}${d.example?' <span class="ex-pill">Example</span>':''}${(()=>{const m=metaOf(d), ds=splitList(m.dataSources), tc=techs(d);
         const rl=ruleHtml(d);
-        return ds.length||tc.length||rl?`<span class="dsline">${ds.length?`<span>Data: ${hl(ds.join(', '))}</span>`:''}${tc.length?`<span>${hl(tc.join(', '))}</span>`:''}${rl}</span>`:'';})()}<span class="who">${esc(changedLine(d))}</span></td><td data-l="Next action">${(a=>`<span class="na" data-t="${a.t}" title="${esc(a.why)}">${a.label}</span>`)(nextAction(d))}</td><td data-l="Stage">${stageLabel(d)} <span class="since">${d.deprecated&&d.deprecatedAt?fmtDate(d.deprecatedAt):d.stage===DEPR?fmtDur(spentIn(d,'depr')):d.deployed&&d.deployedAt?`in ${fmtDur(new Date(d.deployedAt)-new Date(d.created))}`:fmtDur(spentIn(d,STAGES[d.stage].id))}</span>${gapsOf(d).length?` <span class="pill" data-t="${hardGaps(d).length?4:3}">${gapSummary(d)}</span>`:''}${stageProgress(d)?`<span class="sc">${stageProgress(d)}</span>`:''}</td><td class="num" data-l="Detection value (prioritization)">${pcell(d,p)}</td><td class="num" data-l="Threat urgency (triage)">${cell(t)}</td><td data-l="Owner">${hl(metaOf(d).owner)||'–'}</td>
+        return ds.length||tc.length||rl?`<span class="dsline">${ds.length?`<span>Data: ${hl(ds.join(', '))}</span>`:''}${tc.length?`<span>${hl(tc.join(', '))}</span>`:''}${rl}</span>`:'';})()}${d.example&&d.updatedBy==='Example'?'':`<span class="who">${esc(changedLine(d))}</span>`}</td><td data-l="Next action">${(a=>`<span class="na" data-t="${a.t}" title="${esc(a.why)}">${a.label}</span>`)(nextAction(d))}</td><td data-l="Stage">${stageLabel(d)} <span class="since">${d.deprecated&&d.deprecatedAt?fmtDate(d.deprecatedAt):d.stage===DEPR?fmtDur(spentIn(d,'depr')):d.deployed&&d.deployedAt?`in ${fmtDur(new Date(d.deployedAt)-new Date(d.created))}`:fmtDur(spentIn(d,STAGES[d.stage].id))}</span>${gapsOf(d).length?` <span class="pill" data-t="${hardGaps(d).length?4:3}">${gapSummary(d)}</span>`:''}${stageProgress(d)?`<span class="sc">${stageProgress(d)}</span>`:''}</td><td class="num" data-l="Detection value (prioritization)">${pcell(d,p)}</td><td class="num" data-l="Threat urgency (triage)">${cell(t)}</td><td data-l="Owner">${hl(metaOf(d).owner)||'–'}</td>
       <td class="acts"><button class="linkbtn" data-open="${i}">Open</button><button class="linkbtn muted" data-del="${i}">Delete</button></td></tr>`;
   }).join('');
-  renderGaps(); renderCoverage(); renderCalib(); renderTabs(); renderCycle(); renderNext(); save(); renderShare(); renderHistory();
+  renderGaps(); renderCoverage(); renderCalib(); renderTabs(); renderCycle(); renderNext(); save(); renderShare(); renderHistory(); renderExamples();
 }
 function renderCycle(){
   const dep=state.dets.filter(d=>d.deployed&&d.deployedAt);
@@ -1397,6 +1404,89 @@ function buildSummary(d){
   H.push(`<p class="sum-foot">${esc(foot)}</p>`); M.push(`\n_${foot}_`);
   return {html:H.join(''),md:M.join('\n')};
 }
+// Ten made-up detections that show every part of the tool: each stage, gates, gaps, partial data,
+// a failed prediction, reviews that trigger flags, a parked idea and a deprecated rule.
+function exampleSet(){
+  const now=Date.now(), iso=(t)=>new Date(t).toISOString(), ago=(n)=>iso(now-n*DAY);
+  const P=(a,b,c,d,e,f,g)=>({coverage:a,durability:b,complexity:c,confidence:d,noise:e,action:f,cost:g});
+  const T=(impact,relevance,wild,easy,time)=>{const o={impact,relevance,wild,time}; if(easy!=null) o.easy=easy; return o;};
+  const all=(n,v=true)=>Array(n).fill(v);
+  // walk a detection through completed stages: [stageId, days spent], starting some days ago
+  const path=(o,startAgo,spans,current)=>{
+    let t=now-startAgo*DAY; o.created=iso(t); o.dates={}; o.spent={};
+    spans.forEach(([id,days])=>{ o.spent[id]=days*DAY; t+=days*DAY; o.dates[id]=iso(t); });
+    o.enteredAt=t; o.stage=IDX[current];
+    if(current==='deploy'&&o.dates.deploy){ o.deployed=true; o.deployedAt=o.dates.deploy; }
+    return o;
+  };
+  const meta=(source,owner,tactics,techniques,dataSources)=>({source,owner,tactics,techniques,dataSources});
+  const L=[];
+  L.push(path({uid:'ex-lsass',name:'LSASS memory access by unsigned process',scores:{prio:P(4,3,3,4,4,4,3),triage:T(4,4,4,4,3)},
+    meta:meta('Threat intel','Alex',['TA0006'],'T1003.001','Elastic Defend'),indicator:'ttp',rule:'https://git.example.com/detections/rules/lsass-access-unsigned',
+    measured:{coverage:4,confidence:4,noise:4,cost:3},checks:{invest:all(9),dev:all(6),test:all(5),deploy:all(6)},
+    reviews:[{at:ago(30),alerts:6,tp:5,test:'passed',by:'Alex',note:'One false positive from a backup agent, excluded.'}],
+    notes:{test:'Confirmed with Atomic Red Team T1003.001 tests 1 and 2.'}},150,[['req',3],['triage',1],['invest',6],['dev',4],['test',3],['deploy',2]],'deploy'));
+  L.push(path({uid:'ex-kerb',name:'Kerberoasting: RC4 service tickets',scores:{prio:P(3,3,3,3,3,3,3),triage:T(3,3,4,4,3)},
+    meta:meta('Red or purple team','Priya',['TA0006'],'T1558.003','Windows Security 4769, Elastic Defend'),indicator:'ttp',
+    checks:{invest:['partial',true,'gap',true,true,true,false,false,false]},
+    gapNotes:{0:'Elastic Defend on about half of the domain controllers',2:'TicketEncryptionType is not parsed from 4769 events'},
+    notes:{req:'Found by the purple team exercise in September: three service accounts were roasted without an alert.'}},12,[['req',2],['triage',1]],'invest'));
+  L.push(path({uid:'ex-oauth',name:'OAuth consent to unverified application',scores:{prio:P(3,4,3,3,3,3,4),triage:T(4,4,4,4,2)},
+    meta:meta('Threat intel','Sam',['TA0001','TA0003'],'T1528','Entra ID audit logs'),indicator:'artifact',
+    measured:{coverage:3,confidence:3,noise:1},checks:{invest:all(9),dev:all(6),test:[true,true,true,false,false]},
+    notes:{test:'Backup and CRM tools trigger the rule on every new tenant consent. Needs an allowlist of verified publishers.'}},25,[['req',2],['triage',1],['invest',5],['dev',4]],'test'));
+  L.push(path({uid:'ex-admin',name:'New local admin account outside change window',scores:{prio:P(3,4,4,4,4,3,3),triage:T(3,4,4,4,4)},
+    meta:meta('Audit or compliance','Jonas',['TA0003','TA0004'],'T1136.001','Windows Security 4720, 4732'),indicator:'ttp',
+    checks:{invest:all(9),dev:all(6),test:all(5),deploy:all(6)},
+    reviews:[{at:ago(120),alerts:3,tp:3,test:'passed',by:'Jonas'}]},220,[['req',2],['triage',1],['invest',2],['dev',2],['test',1],['deploy',1]],'deploy'));
+  L.push(path({uid:'ex-pwsh',name:'PowerShell download cradle',scores:{prio:P(4,2,3,3,2,3,2),triage:T(3,3,4,4,4)},
+    meta:meta('Incident','Sam',['TA0002'],'T1059.001','PowerShell script block logging, Sysmon'),indicator:'tool',
+    checks:{invest:all(9),dev:all(6),test:all(5),deploy:all(6)},
+    reviews:[{at:ago(70),alerts:40,tp:12,test:'passed',by:'Sam'},{at:ago(7),alerts:420,tp:20,test:'passed',by:'Sam',note:'Software deployment tool started using the same download pattern.'}]},
+    110,[['req',1],['triage',1],['invest',3],['dev',2],['test',2],['deploy',1]],'deploy'));
+  L.push(path({uid:'ex-dns',name:'DNS tunnelling heuristics',scores:{prio:P(3,3,2,2,1,2,3),triage:T(3,3,4,2,2)},
+    meta:meta('Coverage gap','Priya',['TA0011'],'T1071.004','Zeek DNS'),
+    notes:{triage:'High query entropy alone fires on CDNs and security products. Needs a better idea before building.'}},9,[['req',3]],'triage'));
+  L.push(path({uid:'ex-macos',name:'macOS LaunchAgent persistence',scores:{prio:P(3,3,3,3,3,3,3),triage:T(2,1,4,4,3)},
+    meta:meta('Threat intel','Alex',['TA0003'],'T1543.001','Elastic Defend'),
+    notes:{triage:'Only six macOS devices in the estate, all managed by a vendor. Parked.'}},40,[['req',1]],'triage'));
+  L.push(path({uid:'ex-av',name:'Mimikatz string match in process memory',scores:{prio:P(2,1,4,3,3,2,1),triage:T(3,3,4,4,4)},
+    meta:meta('Threat intel','Alex',['TA0006'],'T1003.001','Antivirus logs'),indicator:'artifact',
+    checks:{invest:all(9),dev:all(6),test:all(5),deploy:all(6),depr:all(6)},
+    depr:{reason:'Replaced by a better detection',replacement:'ex-lsass'},
+    reviews:[{at:ago(200),alerts:0,tp:0,test:'failed',by:'Alex',note:'Renamed binary bypasses the string match.'}]},420,[['req',1],['triage',1],['invest',1],['dev',1],['test',1],['deploy',1]],'deploy'));
+  { const d=L[L.length-1]; d.stage=DEPR; d.deprecated=true; d.deprecatedAt=ago(20); d.dates.depr=d.deprecatedAt; d.spent.depr=3*DAY; }
+  L.push(path({uid:'ex-webshell',name:'Web shell written by IIS worker process',scores:{prio:P(4,3,3,4,3,4,3),triage:T(4,3,4,4,3)},
+    meta:meta('Threat intel','Jonas',['TA0003'],'T1505.003','Elastic Defend file events'),indicator:'ttp',rule:'https://git.example.com/detections/rules/iis-webshell-write',
+    checks:{invest:['partial',true,true,true,true,true,true,true,true],dev:[true,true,false,false,false,false]},
+    gapNotes:{0:'Elastic Defend on about 70% of internet-facing IIS servers'}},18,[['req',2],['triage',1],['invest',4]],'dev'));
+  L.push(path({uid:'ex-ransom',name:'Mass file renames on file shares',scores:{prio:{coverage:3,durability:3,complexity:2},triage:{}},
+    meta:meta('Incident','Priya',['TA0040'],'T1486','Windows file share auditing'),
+    notes:{req:'Raised after the ransomware tabletop exercise. Needs volume baselines per share.'}},3,[],'req'));
+  return L.map(d=>({...d,example:true,updatedBy:'Example',updatedAt:d.created,reviewedAt:d.reviews&&d.reviews.length?d.reviews[d.reviews.length-1].at:undefined}));
+}
+function loadExamples(){
+  purgeBlanks();
+  const have=new Set(state.dets.map(d=>d.uid));
+  const add=hydrate(exampleSet()).filter(d=>!have.has(d.uid));
+  add.forEach(d=>{ d.id=++uid; state.dets.push(d); });
+  state.dets=state.dets.filter(d=>!isBlank(d));
+  resetSnap(); state.tab='pipe'; state.cur=0; render(); window.scrollTo(0,0);
+  flash(add.length?`Loaded ${add.length} example detections. Open any of them to look around.`:'Example data is already loaded.',6000);
+}
+function removeExamples(){
+  const n=state.dets.filter(d=>d.example).length;
+  state.dets=state.dets.filter(d=>!d.example);
+  if(!state.dets.length) state.dets.push(newDetection());
+  state.cur=0; state.view=det().stage; resetSnap();
+  if(state.screen!=='overview') state.screen='overview';
+  render(); flash(`Removed ${n} example detection${n===1?'':'s'}.`);
+}
+function renderExamples(){
+  const has=state.dets.some(d=>d.example);
+  $('exBanner').hidden=!has;
+  $('exToggle').textContent=has?'Remove example data':'Load example data';
+}
 function applyScreen(){
   $('viewOverview').hidden=state.screen!=='overview';
   $('viewDetail').hidden=state.screen!=='detail';
@@ -1463,6 +1553,8 @@ $('newDet').addEventListener('click',()=>{
   $('detName').focus();
 });
 $('backBtn').addEventListener('click',()=>show('overview'));
+$('exToggle').addEventListener('click',()=>{ state.dets.some(d=>d.example)?removeExamples():loadExamples(); });
+$('exRemove').addEventListener('click',removeExamples);
 $('summaryBtn').addEventListener('click',()=>show('summary'));
 $('sumBack').addEventListener('click',()=>show('detail'));
 $('sumCopy').addEventListener('click',async()=>{
@@ -1612,6 +1704,7 @@ $('copyGaps').addEventListener('click',async()=>{
   try{ await navigator.clipboard.writeText(md); flash('Data gaps copied as Markdown.'); }catch{ flash('Clipboard blocked by the browser.'); }
 });
 $('pipeBody').addEventListener('click',e=>{
+  if(e.target.closest('[data-load-examples]')){ loadExamples(); return; }
   const o=e.target.closest('[data-open]'), x=e.target.closest('[data-del]');
   if(o) openDetection(+o.dataset.open);
   if(x) deleteDetection(+x.dataset.del,x);
@@ -1656,14 +1749,14 @@ $('dlCsv').addEventListener('click',()=>{
 function sharedFile(){
   stamp();
   // stable order and no personal view settings, so Git diffs stay small and readable
-  const dets=[...state.dets].filter(d=>!isBlank(d)).sort((a,b)=>(a.created<b.created?-1:a.created>b.created?1:0)||(a.uid<b.uid?-1:1)).map(({baseAt,...rest})=>rest);
+  const dets=[...state.dets].filter(d=>!isBlank(d)&&!d.example).sort((a,b)=>(a.created<b.created?-1:a.created>b.created?1:0)||(a.uid<b.uid?-1:1)).map(({baseAt,...rest})=>rest);
   const tombs=[...state.tombs].sort((a,b)=>a.uid<b.uid?-1:1);
   return JSON.stringify({version:6,savedAt:new Date().toISOString(),savedBy:state.settings.me||'',detections:dets,tombs},null,2);
 }
 function markSynced(){ state.dets.forEach(d=>d.baseAt=d.updatedAt); state.settings.lastShared=new Date().toISOString(); resetSnap(); saveNow(); renderShare(); }
 function renderShare(){
   const last=state.settings.lastShared, el=$('shareNote'); if(!el) return;
-  const changed=state.dets.filter(d=>!isBlank(d)&&(!last||d.updatedAt>last)).length+state.tombs.filter(t=>!last||t.updatedAt>last).length;
+  const changed=state.dets.filter(d=>!isBlank(d)&&!d.example&&(!last||d.updatedAt>last)).length+state.tombs.filter(t=>!last||t.updatedAt>last).length;
   if(!changed){ el.className='share-note'; el.textContent=last?`Shared ${fmtAgo(last)}, nothing new since.`:''; return; }
   const old=!last||Date.now()-new Date(last)>LIMITS.shareDays*DAY;
   el.className='share-note'+(old?' warn-s':'');
