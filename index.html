@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detection Engineering Life Cycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F4; --surface:#FFFFFF; --ink:#1C2430; --muted:#5B6675; --line:#D3D9E0;
+  --l1:#B8343F; --l1bg:#F9E1E3; --l2:#A5600C; --l2bg:#FBEBD3;
+  --l3:#2B7445; --l3bg:#DDF0E2; --l4:#2459A8; --l4bg:#DCE8F8;
+  --empty:#E1E6EC; --focus:#2459A8;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#141920; --surface:#1D242D; --ink:#E4E9EF; --muted:#9AA5B3; --line:#313B47;
+    --l1:#F08A92; --l1bg:#3A1F24; --l2:#F0B566; --l2bg:#3A2C17;
+    --l3:#7FCB97; --l3bg:#1B3324; --l4:#86B1F0; --l4bg:#1A2A42;
+    --empty:#2A333E; --focus:#86B1F0;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:16px;line-height:1.5}
+h1,h2,h3,.tier,.total,.stop b{font-family:"Familjen Grotesk",system-ui,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:40px 24px 120px}
+
+header{display:grid;gap:14px;margin-bottom:28px}
+h1{font-size:clamp(2rem,5vw,3.25rem);line-height:1.05;margin:0;letter-spacing:-0.02em;font-weight:700}
+.lede{color:var(--muted);max-width:64ch;margin:0}
+
+.picker{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:28px}
+.field{display:grid;gap:6px;flex:1 1 260px;max-width:480px}
+.field label{font-weight:700;font-size:.9rem}
+.field input,.field select{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:11px 13px;font-size:1rem;width:100%}
+.status{font-size:.9rem;color:var(--muted);align-self:center}
+
+/* Lifecycle rail */
+.rail{position:relative;display:grid;grid-template-columns:repeat(7,1fr);margin:0 0 36px;padding:0;list-style:none}
+.rail::before{content:"";position:absolute;left:7.143%;right:21.429%;top:17px;height:2px;background:var(--line)}
+.rail::after{content:"";position:absolute;left:78.571%;right:7.143%;top:17px;border-top:2px dashed var(--line)}
+.rail .fill{position:absolute;left:7.143%;top:17px;height:2px;background:var(--ink);transition:width .3s}
+.stop{position:relative;display:grid;justify-items:center;align-content:start;align-self:start;gap:6px;background:none;border:0;padding:0 2px;cursor:pointer;text-align:center;width:100%}
+.stop .dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--paper);border:2px solid var(--line);font-weight:700;font-size:.9rem;position:relative;z-index:1}
+.stop b{font-size:.92rem;font-weight:600;line-height:1.15}
+.stop small{font-size:.75rem;color:var(--muted);line-height:1.2}
+.stop.done .dot{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.stop.current .dot{border-color:var(--l4);color:var(--l4);box-shadow:0 0 0 4px var(--l4bg)}
+.stop.scored .dot{border-style:double;border-width:4px}
+.stop.done.scored .dot{border-style:solid;border-width:2px}
+.stop[aria-selected="true"] b{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+
+.stage-head{margin-bottom:18px;max-width:70ch}
+.stage-head h2{margin:0;font-size:1.75rem;letter-spacing:-0.01em}
+.stage-head p{margin:4px 0 0;color:var(--muted)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
+
+/* Scoring */
+.crit{padding:18px 0;border-top:1px solid var(--line)}
+.crit:first-child{border-top:0;padding-top:4px}
+.crit-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:4px}
+.crit h3{margin:0;font-size:1.15rem;font-weight:600}
+.crit .val{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.95rem;white-space:nowrap}
+.crit p{margin:0 0 12px;color:var(--muted);font-size:.93rem;max-width:66ch}
+.opts{display:grid;gap:8px}
+.opts.c4{grid-template-columns:repeat(4,1fr)} .opts.c2{grid-template-columns:repeat(2,1fr)}
+.opt{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:10px 8px;cursor:pointer;display:grid;gap:2px;justify-items:center;text-align:center;transition:background-color .15s,border-color .15s}
+.opt .pts{font-weight:700;font-variant-numeric:tabular-nums}
+.opt .lbl{font-size:.88rem;line-height:1.25}
+.opt:hover{border-color:var(--muted)}
+.opt[aria-pressed="true"][data-l="1"]{background:var(--l1bg);border-color:var(--l1);color:var(--l1)}
+.opt[aria-pressed="true"][data-l="2"]{background:var(--l2bg);border-color:var(--l2);color:var(--l2)}
+.opt[aria-pressed="true"][data-l="3"]{background:var(--l3bg);border-color:var(--l3);color:var(--l3)}
+.opt[aria-pressed="true"][data-l="4"]{background:var(--l4bg);border-color:var(--l4);color:var(--l4)}
+.opt:disabled{opacity:.4;cursor:not-allowed}
+.note{font-size:.85rem;color:var(--muted);margin-top:8px}
+
+/* Checklists */
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.checks li label{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;border-top:1px solid var(--line);cursor:pointer}
+.checks li:first-child label{border-top:0}
+.checks input[type=checkbox]{width:20px;height:20px;margin:2px 0 0;accent-color:var(--l3);flex:none}
+.checks input:checked + span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.notes{display:grid;gap:6px;margin-top:22px}
+.notes label{font-weight:700;font-size:.9rem}
+.notes textarea{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:11px 13px;min-height:110px;resize:vertical;line-height:1.45}
+
+/* Side panel */
+.panel{position:sticky;top:24px;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:22px;display:grid;gap:16px}
+.panel-top{display:grid;gap:8px}
+.total{white-space:nowrap;font-size:4rem;line-height:.9;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.03em}
+.total span{font-size:1.25rem;color:var(--muted);font-weight:500;letter-spacing:0}
+.strip{display:grid;gap:4px}
+.cells,.strip-legend{display:grid;gap:4px}
+.cell{height:44px;border-radius:4px;background:var(--empty);transition:background-color .2s}
+.cell[data-l="1"]{background:var(--l1)} .cell[data-l="2"]{background:var(--l2)}
+.cell[data-l="3"]{background:var(--l3)} .cell[data-l="4"]{background:var(--l4)}
+.cell.on{background:var(--l3)}
+.strip-legend{font-size:.7rem;color:var(--muted);text-align:center;line-height:1.2}
+.tier{font-size:1.35rem;font-weight:700;margin:0;line-height:1.2}
+.tier[data-t="1"]{color:var(--l4)} .tier[data-t="2"]{color:var(--l3)}
+.tier[data-t="3"]{color:var(--l2)} .tier[data-t="4"]{color:var(--l1)} .tier[data-t="0"]{color:var(--muted)}
+.advice{margin:0;color:var(--muted);font-size:.93rem}
+.gate{margin:0;font-size:.93rem;border-left:3px solid var(--l4);padding-left:10px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.panel-full{display:none}
+.hint{font-size:.85rem;color:var(--muted);margin:0;min-height:1.3em}
+
+/* Pipeline */
+.pipeline{margin-top:64px}
+.pipe-head{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.pipeline h2{margin:0;font-size:1.6rem}
+.pipeline .sub{color:var(--muted);margin:4px 0 0;font-size:.93rem;max-width:64ch}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1.5px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:700;color:var(--muted);font-size:.85rem}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:normal;min-width:160px}
+td:nth-child(2){white-space:normal;min-width:130px}
+tr.active td{background:var(--l4bg)}
+td.num{font-variant-numeric:tabular-nums}
+.pill{padding:2px 8px;border-radius:999px;font-weight:700;font-size:.82rem;white-space:nowrap}
+.pill[data-t="1"]{background:var(--l4bg);color:var(--l4)} .pill[data-t="2"]{background:var(--l3bg);color:var(--l3)}
+.pill[data-t="3"]{background:var(--l2bg);color:var(--l2)} .pill[data-t="4"]{background:var(--l1bg);color:var(--l1)}
+.linkbtn{background:none;border:0;color:inherit;cursor:pointer;text-decoration:underline;padding:0;font-weight:700}
+.linkbtn.muted{color:var(--muted);font-weight:400}
+.bar{display:inline-block;width:70px;height:6px;background:var(--empty);border-radius:3px;vertical-align:middle;margin-right:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--l3)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+@media (max-width:760px){
+  .rail{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px;scroll-snap-type:x mandatory}
+  .rail::before,.rail::after,.rail .fill{display:none}
+  .stop{flex:0 0 96px;scroll-snap-align:start}
+}
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .panel{position:sticky;bottom:12px;top:auto;padding:16px;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+  .total{font-size:2.75rem}
+  .cell{height:22px}
+  .strip-legend{display:none}
+  .panel-top{display:flex;gap:14px;align-items:center}
+  .hint:empty{display:none}
+  /* sticky bar keeps only the score; everything else lives in the block below it */
+  #panel > :not(.panel-top):not(.strip){display:none}
+  #panel .panel-top .advice,#panel .panel-top .ind-line{display:none}
+  .panel-full{display:grid;position:static;box-shadow:none}
+  .panel-full > .panel-top,.panel-full > .strip{display:none}
+}
+.inds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.ind{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;text-align:left;display:grid;gap:2px}
+.ind b{font-size:.95rem}
+.ind small{color:var(--muted);font-size:.8rem;line-height:1.3}
+.ind .pain{font-size:.75rem;font-weight:700}
+.ind[data-l="1"] .pain{color:var(--l1)} .ind[data-l="2"] .pain{color:var(--l2)} .ind[data-l="3"] .pain{color:var(--l3)} .ind[data-l="4"] .pain{color:var(--l4)}
+.ind[aria-pressed="true"][data-l="1"]{background:var(--l1bg);border-color:var(--l1)}
+.ind[aria-pressed="true"][data-l="2"]{background:var(--l2bg);border-color:var(--l2)}
+.ind[aria-pressed="true"][data-l="3"]{background:var(--l3bg);border-color:var(--l3)}
+.ind[aria-pressed="true"][data-l="4"]{background:var(--l4bg);border-color:var(--l4)}
+.group-title{font-size:1.15rem;font-weight:600;margin:26px 0 2px}
+.group-title:first-child{margin-top:0}
+.group-help{margin:0 0 6px;color:var(--muted);font-size:.93rem;max-width:66ch}
+.warn{margin:0;font-size:.9rem;color:var(--l2);background:var(--l2bg);border-radius:8px;padding:8px 10px}
+.ind-line{margin:0;font-size:.93rem}
+.lsrow{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
+.checks li:first-child.lsrow{border-top:0}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:6px 14px;cursor:pointer;font-weight:700;font-size:.88rem}
+.seg button+button{border-left:1.5px solid var(--line)}
+.seg button[data-v="ok"][aria-pressed="true"]{background:var(--l3bg);color:var(--l3)}
+.seg button[data-v="gap"][aria-pressed="true"]{background:var(--l1bg);color:var(--l1)}
+.seg button[data-v="partial"][aria-pressed="true"]{background:var(--l2bg);color:var(--l2)}
+.gapnote.partial{border-color:var(--l2)}
+.cell.partial{background:var(--l2)}
+.gap-row .n.partial{color:var(--l2)}
+.gapnote{grid-column:1/-1;width:100%;background:var(--surface);border:1.5px solid var(--l1);border-radius:8px;padding:8px 11px;font-size:.93rem}
+.cell.gap{background:var(--l1)}
+.gapcount{color:var(--l1);font-weight:700}
+.gaps{margin-top:64px}
+.gap-row{padding:18px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:8px 32px}
+.gap-row:first-child{border-top:0}
+.gap-row h3{margin:0;font-size:1.15rem;font-weight:600}
+.gap-row .n{color:var(--l1);font-weight:700;font-size:.93rem;margin:2px 0 0}
+.gap-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.gap-list li{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.gap-list .gn{color:var(--muted);font-size:.93rem}
+.gap-empty{color:var(--muted);margin:0}
+.gaps-body{background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:6px 20px}
+.save-status{font-size:.85rem;color:var(--muted);margin:-16px 0 24px}
+.save-status.bad{color:var(--l2)}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;margin-bottom:8px}
+.mf{display:grid;gap:5px;align-content:start}
+.mf.full{grid-column:1/-1}
+.mf label,.mf .lab{font-weight:700;font-size:.9rem}
+.mf input,.mf select,.filters input,.filters select{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;font-size:.95rem;width:100%}
+.mf small{color:var(--muted);font-size:.82rem}
+.mf small.bad{color:var(--l1)}
+.tactics{display:flex;flex-wrap:wrap;gap:6px}
+.tac{background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:.85rem}
+.tac[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.missing{margin:0;font-size:.9rem;color:var(--muted)}
+.missing b{color:var(--l2)}
+.delta{font-size:.82rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.delta.eq{background:var(--empty);color:var(--muted)} .delta.up{background:var(--l3bg);color:var(--l3)} .delta.down{background:var(--l1bg);color:var(--l1)}
+.pred{font-size:.9rem;color:var(--muted);margin:0 0 10px}
+.arrow{color:var(--muted);font-weight:400}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;align-items:center;gap:8px;margin-bottom:10px}
+.cov{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.tc{border:1.5px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:4px;align-content:start;min-height:112px;background:var(--surface);cursor:pointer;text-align:left}
+.tc.none{border-style:dashed;background:transparent}
+.tc.prog{background:var(--l2bg);border-color:var(--l2)}
+.tc.live{background:var(--l3bg);border-color:var(--l3)}
+.tc b{font-size:.88rem;line-height:1.2}
+.tc .cnt{font-size:.78rem;color:var(--muted)}
+.tc .tids{font-size:.74rem;line-height:1.35;word-break:break-word}
+.cov-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-top:10px}
+.cov-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px;border:1.5px solid var(--line)}
+.cov-legend .lv{background:var(--l3bg);border-color:var(--l3)} .cov-legend .pg{background:var(--l2bg);border-color:var(--l2)} .cov-legend .nn{border-style:dashed}
+.calib{display:grid;gap:0}
+.cal-row{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:4px 24px;padding:14px 0;border-top:1px solid var(--line);align-items:baseline}
+.cal-row:first-child{border-top:0}
+.cal-row h3{margin:0;font-size:1.05rem;font-weight:600}
+.cal-row p{margin:0}
+.section{margin-top:64px}
+.dh-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.history{margin-top:40px;border-top:1.5px solid var(--line);padding-top:14px}
+.history summary{cursor:pointer;font-family:"Familjen Grotesk",system-ui,sans-serif;font-weight:600;font-size:1.1rem}
+.history .cnt{font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:.78rem;font-weight:700;background:var(--empty);color:var(--muted);border-radius:999px;padding:1px 7px;margin-left:4px}
+.history .cnt:empty{display:none}
+.history ol{list-style:none;margin:12px 0;padding:0;display:grid;gap:0}
+.history li{display:grid;grid-template-columns:130px 110px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:.92rem}
+.history li:first-child{border-top:0}
+.h-when,.h-who{color:var(--muted);font-size:.85rem}
+.h-empty{display:block!important;color:var(--muted)}
+.summary{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:28px 32px;max-width:820px}
+.summary h1{font-size:clamp(1.6rem,4vw,2.2rem);margin:0 0 14px;letter-spacing:-0.02em}
+.summary h2{font-size:1.15rem;margin:22px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
+.summary .kv{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:5px 0;font-size:.95rem}
+.summary .kv>span:first-child{color:var(--muted)}
+.summary p{margin:4px 0}
+.sum-foot{margin-top:20px!important;color:var(--muted);font-size:.85rem}
+@media (max-width:560px){.history li{grid-template-columns:1fr;gap:2px}.summary{padding:18px}.summary .kv{grid-template-columns:1fr;gap:0}}
+@media print{
+  .topbar,.no-print,#viewOverview,#viewDetail{display:none!important}
+  #viewSummary{display:block!important}
+  body{background:#fff;color:#000}
+  .summary{border:0;padding:0;max-width:none;background:#fff;color:#000}
+  .summary .kv>span:first-child,.sum-foot{color:#444}
+  .wrap{padding:0}
+}
+@media (min-width:1000px){
+  #stageBody .crit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);column-gap:24px;align-items:center;padding:14px 0}
+  #stageBody .crit>.crit-head,#stageBody .crit>p{grid-column:1}
+  #stageBody .crit>.crit-head{margin-bottom:2px}
+  #stageBody .crit>p{margin:0}
+  #stageBody .crit>.opts{grid-column:2;grid-row:1 / span 3}
+  #stageBody .crit>.note{grid-column:1 / -1}
+  #stageBody .opt{padding:7px 6px}
+  #stageBody .opt .lbl{font-size:.82rem}
+}
+.eyebrow{margin:0;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.status-top .tier{font-size:1.6rem}
+.small-line{margin:0;font-size:.88rem;color:var(--muted)}
+.topbar{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1.5px solid var(--line)}
+.topbar-in{max-width:1180px;margin:0 auto;padding:10px 24px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{background:none;border:0;padding:4px 0;cursor:pointer;font-family:"Familjen Grotesk",system-ui,sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:-0.01em}
+.topbar .me{margin:0}
+.ov-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:8px}
+.ov-head h1{font-size:clamp(1.8rem,4vw,2.4rem);margin:0 0 6px}
+.ov-head .lede{max-width:62ch;font-size:.95rem}
+.ov-head .save-status{margin:6px 0 0}
+.overview{margin-top:24px}
+.detail-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.detail-head select{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.92rem;max-width:340px}
+.back{padding:7px 12px;font-size:.92rem}
+.title-input{resize:none;overflow:hidden;line-height:1.15;display:block;width:100%;font-family:"Familjen Grotesk",system-ui,sans-serif;font-size:clamp(1.6rem,4vw,2.4rem);font-weight:700;letter-spacing:-0.02em;background:transparent;border:1.5px solid transparent;border-radius:10px;padding:4px 8px;margin:0 0 18px -9px}
+.title-input:hover{border-color:var(--line)}
+.title-input:focus{border-color:var(--focus);background:var(--surface)}
+.title-input:placeholder-shown{border-color:var(--line)}
+.wrap{padding-top:28px}
+.stage-head,.overview,#mergeReport{scroll-margin-top:76px}
+@media (max-width:900px){.stage-head,.overview,#mergeReport{scroll-margin-top:12px}}
+@media (min-width:901px){.panel{top:76px}}
+.ov-hint:empty{display:none}
+.overview .tp>.sub{margin-top:4px}
+@media (max-width:900px){.topbar{position:static}}
+@media (max-width:560px){.lsrow{grid-template-columns:1fr}.lsrow .seg{justify-self:start}.topbar-in{padding:8px 16px;gap:6px}.brand{font-size:1rem}.topbar .me input{width:150px}.detail-head select{max-width:100%;flex:1}}
+.th-sub{display:block;font-weight:400;font-size:.75rem}
+#p-pipe th{white-space:normal;vertical-align:bottom}
+.explain{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 22px}
+.explain>div{border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:4px;align-content:start;font-size:.92rem;color:var(--muted)}
+.explain>div.on{border-color:var(--ink);background:var(--surface);color:var(--ink)}
+.explain b{font-family:"Familjen Grotesk",system-ui,sans-serif;font-size:1.02rem;color:var(--ink)}
+.explain .out{font-weight:700}
+.explain p{grid-column:1/-1;margin:0;font-size:.9rem;color:var(--muted)}
+@media (max-width:560px){.explain{grid-template-columns:1fr}}
+.share-note{margin:0 0 0 6px;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+.share-note.warn-s{color:var(--l2);font-weight:700}
+.share-note button{font-size:.85rem;padding:5px 10px}
+.rule-link{font-weight:700}
+.rv-table{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:8px}
+.rv-table th,.rv-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.rv-table td.note{white-space:normal;color:var(--muted)}
+.rv-bad{color:var(--l1);font-weight:700} .rv-mid{color:var(--l2);font-weight:700} .rv-good{color:var(--l3);font-weight:700}
+.me{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-16px 0 24px;font-size:.88rem;color:var(--muted)}
+.me input{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.9rem;width:200px}
+.me input:placeholder-shown{border-color:var(--l2)}
+.changed{color:var(--muted);font-size:.85rem}
+.tier-cell{display:inline-flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.tw{font-size:.88rem}
+.sc{display:block;font-size:.78rem;color:var(--muted);margin-top:2px}
+td[data-l^="Detection value"],td[data-l^="Threat urgency"]{white-space:normal;min-width:136px}
+td.acts{white-space:normal;width:1%}
+td.acts .linkbtn{display:block;margin:2px 0}
+td[data-l="Stage"] .pill{display:inline-block;margin-top:2px}
+.dsline{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:.8rem;color:var(--ink);opacity:.8;font-weight:400;margin-top:2px}
+mark{background:var(--l2bg);color:inherit;border-radius:3px;padding:0 1px}
+.who{display:block;color:var(--muted);font-size:.78rem;font-weight:400}
+.merge-report{margin:0 0 14px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);font-size:.93rem}
+.merge-report ul{margin:6px 0 0;padding-left:18px}
+.merge-report button{margin-top:8px}
+tr.dep td:not(.acts){opacity:.6}
+.inline-confirm{border:1.5px solid var(--l1);background:var(--l1bg);border-radius:10px;padding:12px 14px;display:grid;gap:10px;margin-top:8px}
+.inline-confirm p{margin:0;white-space:normal;font-size:.95rem;color:var(--ink)}
+tr.confirm-row td{white-space:normal;background:var(--paper)}
+.btn.danger{background:var(--l1);border-color:var(--l1);color:var(--surface)}
+.next{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:-12px 0 24px;font-size:.95rem}
+.next .why{color:var(--muted)}
+.na{padding:3px 10px;border-radius:999px;font-weight:700;font-size:.85rem;white-space:nowrap;background:var(--empty);color:var(--muted)}
+.na[data-t="1"]{background:var(--l4bg);color:var(--l4)} .na[data-t="2"]{background:var(--l3bg);color:var(--l3)}
+.na[data-t="3"]{background:var(--l2bg);color:var(--l2)} .na[data-t="4"]{background:var(--l1bg);color:var(--l1)}
+.review{display:grid;gap:10px}
+.review .mf select,.review .mf input,.dates input{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:7px 10px;font-size:.92rem;width:100%}
+.dates{display:grid;gap:8px;margin-top:8px}
+.dates label{display:grid;gap:4px;font-size:.85rem;font-weight:700}
+.ov-hint{margin:0 0 10px}
+.gtoggle{display:flex;gap:8px;align-items:center;font-size:.88rem;color:var(--muted);cursor:pointer}
+.gtoggle input{width:16px;height:16px;accent-color:var(--ink);margin:0}
+.gates{font-size:.85rem;color:var(--muted)}
+.gates summary{cursor:pointer}
+.gates ul{margin:6px 0 0;padding-left:18px;display:grid;gap:3px}
+.gates li.hit{color:var(--l1);font-weight:700}
+.since{color:var(--muted);font-size:.82rem;white-space:nowrap}
+.cycle{margin:0 0 12px;font-size:.93rem}
+.stop.done small{color:var(--l3)}
+.stop.optional .dot{border-style:dashed}
+.stop.optional:not(.done):not(.current) b{color:var(--muted)}
+.dc{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dc.up{color:var(--l3);font-weight:700} .dc.down{color:var(--l1);font-weight:700} .dc.eq,.dc.na{color:var(--muted)}
+.overview{margin-top:56px}
+.ov-bar{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;border-bottom:1.5px solid var(--line);margin-bottom:16px}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;margin-bottom:-1.5px;cursor:pointer;font-family:"Familjen Grotesk",system-ui,sans-serif;font-weight:600;font-size:1.05rem;color:var(--muted);white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tab .cnt{font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:.78rem;font-weight:700;background:var(--empty);color:var(--muted);border-radius:999px;padding:1px 7px;margin-left:4px}
+.tab .cnt:empty{display:none}
+.tab .cnt.alert{background:var(--l1bg);color:var(--l1)}
+.tp > .sub{margin:0 0 12px;color:var(--muted);font-size:.93rem}
+.menu{position:relative;margin-bottom:8px}
+.menu summary{list-style:none;font-size:.9rem;padding:7px 12px}
+.menu summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:5;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:6px;display:grid;min-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.menu-list button{background:none;border:0;text-align:left;white-space:nowrap;padding:9px 10px;border-radius:6px;cursor:pointer}
+.menu-list button:hover{background:var(--paper)}
+.menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+@media (max-width:1000px){.cov{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:760px){.meta,.filters{grid-template-columns:1fr}.cov{grid-template-columns:repeat(2,1fr)}.cal-row{grid-template-columns:1fr}}
+@media (max-width:760px){.gap-row{grid-template-columns:1fr}}
+@media (max-width:760px){.inds{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){
+  .wrap{padding:28px 16px 100px}
+  .opts.c4{grid-template-columns:repeat(4,1fr);gap:6px}
+  .opts .opt{padding:8px 3px}
+  .opts .opt .lbl{font-size:.74rem;line-height:1.2;hyphens:auto}
+}
+@media (max-width:560px){
+  #p-pipe table,#p-pipe tbody,#p-pipe tr,#p-pipe td{display:block}
+  #p-pipe thead{display:none}
+  #p-pipe tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding:14px;border-bottom:1px solid var(--line)}
+  #p-pipe tr:last-child{border-bottom:0}
+  #p-pipe td{border:0;padding:0;min-width:0;white-space:normal}
+  #p-pipe td[data-l]::before{content:attr(data-l);display:block;font-size:.72rem;color:var(--muted);font-weight:700}
+  #p-pipe td[data-l="Detection"]{grid-column:1/-1;font-weight:700}
+  #p-pipe td[data-l="Detection"]::before{display:none}
+  #p-pipe td.acts{grid-column:1/-1;display:flex;gap:16px}
+  #p-pipe td[data-l="Next action"]{grid-column:1/-1}
+  #p-pipe tr.empty-row td{grid-column:1/-1}
+  #p-pipe tr.active{background:var(--l4bg)}
+  #p-pipe tr.active td{background:none}
+  #p-pipe tr.confirm-row{display:block;padding:0 14px 14px;border-bottom:1px solid var(--line)}
+  #p-pipe tr.confirm-row td{background:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<noscript><style>.wrap{display:none}</style></noscript>
+</head>
+<body>
+<noscript>
+  <div style="max-width:560px;margin:48px auto;padding:0 20px;font-family:system-ui,sans-serif;line-height:1.5">
+    <h1 style="font-size:1.6rem;margin:0 0 12px">This viewer can't run the tool</h1>
+    <p>You're looking at a preview that shows the page without running it, such as the iPhone Files preview. Open the file in a web browser instead.</p>
+    <p>On a computer, open it in Chrome, Edge, Firefox or Safari. On a phone, use it inside the Claude app, or open it from a web address if it is hosted for your team.</p>
+  </div>
+</noscript>
+<div class="topbar">
+  <div class="topbar-in">
+    <button type="button" class="brand" id="goHome" aria-label="Go to overview">Detection engineering life cycle</button>
+    <p class="me"><label for="meName">Your name</label><input id="meName" type="text" placeholder="So others see who changed what" autocomplete="name"><span class="share-note" id="shareNote"></span></p>
+  </div>
+</div>
+<div class="wrap">
+  <section id="viewOverview" aria-labelledby="ovTitle">
+    <div class="ov-head">
+      <div>
+        <h1 id="ovTitle">Detections</h1>
+        <p class="lede">Six stages from requirement to production, plus optional deprecation. Prioritization judges the detection itself, triage judges the threat and the work.</p>
+        <p class="save-status" id="saveStatus" role="status"></p>
+      </div>
+      <button class="btn" id="newDet">New detection</button>
+    </div>
+  <section class="overview" aria-label="Overview">
+    <div class="ov-bar">
+      <div class="tabs" role="tablist" aria-label="Overview views">
+        <button class="tab" role="tab" id="t-pipe" data-tab="pipe" aria-controls="p-pipe">Pipeline <span class="cnt" id="c-pipe"></span></button>
+        <button class="tab" role="tab" id="t-cov" data-tab="cov" aria-controls="p-cov">ATT&amp;CK coverage <span class="cnt" id="c-cov"></span></button>
+        <button class="tab" role="tab" id="t-gaps" data-tab="gaps" aria-controls="p-gaps">Data gaps <span class="cnt" id="c-gaps"></span></button>
+        <button class="tab" role="tab" id="t-cal" data-tab="cal" aria-controls="p-cal">Prediction check <span class="cnt" id="c-cal"></span></button>
+      </div>
+      <details class="menu">
+        <summary class="btn ghost">Share and export</summary>
+        <div class="menu-list">
+          <button id="copyMd">Copy pipeline as Markdown</button>
+          <button id="dlCsv">Download pipeline as CSV</button>
+          <button id="copyGaps">Copy data gaps as Markdown</button>
+          <hr>
+          <button id="importCsv">Import detections (CSV)</button>
+          <button id="csvTemplate">Download CSV import template</button>
+          <hr>
+          <button id="saveJson">Save shared file (JSON)</button>
+          <button id="mergeJson">Merge a shared file (JSON)</button>
+          <button id="loadJson">Replace everything with a file</button>
+        </div>
+      </details>
+      <input type="file" id="fileIn" accept="application/json,.json" class="sr" tabindex="-1" aria-hidden="true">
+      <input type="file" id="csvIn" accept=".csv,text/csv" class="sr" tabindex="-1" aria-hidden="true">
+    </div>
+
+    <p class="hint ov-hint" role="status"></p>
+    <div class="merge-report" id="mergeReport" hidden></div>
+    <div class="tp" role="tabpanel" id="p-pipe" aria-labelledby="t-pipe">
+      <p class="sub" id="pipeSub">Ranked by next action, then prioritization and triage scores.</p>
+      <p class="cycle" id="cycle"></p>
+      <div class="filters">
+        <input id="fSearch" type="search" placeholder="Search name, technique, data source or owner" aria-label="Search pipeline">
+        <select id="fTactic" aria-label="Filter by tactic"></select>
+        <select id="fOwner" aria-label="Filter by owner"></select>
+        <label class="gtoggle" id="mineWrap"><input type="checkbox" id="fMine"> Only mine</label>
+        <label class="gtoggle"><input type="checkbox" id="fDep" checked> Show deprecated</label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Detection</th><th>Next action</th><th>Stage</th><th>Detection value<span class="th-sub">prioritization</span></th><th>Threat urgency<span class="th-sub">triage</span></th><th>Owner</th><th></th></tr></thead>
+          <tbody id="pipeBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tp" role="tabpanel" id="p-cov" aria-labelledby="t-cov" hidden>
+      <p class="sub">Tactics and techniques from Requirements Discovery. Select a tactic to filter the pipeline.</p>
+      <p class="cycle" id="covSummary"></p>
+      <div class="cov" id="cov"></div>
+      <div class="cov-legend"><span><i class="lv"></i>At least one deployed</span><span><i class="pg"></i>In progress only</span><span><i class="nn"></i>No detections</span><span>Deprecated rules are not counted</span></div>
+    </div>
+
+    <div class="tp" role="tabpanel" id="p-gaps" aria-labelledby="t-gaps" hidden>
+      <p class="sub">Log source gaps and partial coverage from Investigation. Missing data first, then partly missing, each ranked by how many detections it affects.</p>
+      <div class="gaps-body" id="gapsBody"></div>
+    </div>
+
+    <div class="tp" role="tabpanel" id="p-cal" aria-labelledby="t-cal" hidden>
+      <p class="sub">Requirements Discovery predictions compared with what Testing measured.</p>
+      <div id="calEmpty"></div>
+      <div id="calWrap" hidden>
+        <h3 class="group-title">Per detection</h3>
+        <p class="group-help">Predicted → measured for each rule, biggest misses first. Select a detection to open its Testing stage.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Detection</th><th>Coverage</th><th>Confidence</th><th>Noisiness</th><th>Attacker cost</th><th>Prioritization</th><th>Production noise</th></tr></thead>
+          <tbody id="calRules"></tbody>
+        </table></div>
+        <h3 class="group-title" style="margin-top:28px">Across all detections</h3>
+        <p class="group-help">Average miss per criterion. Use it to score new requirements more honestly.</p>
+        <div class="gaps-body calib" id="calib"></div>
+      </div>
+    </div>
+  </section>
+  </section>
+
+  <section id="viewSummary" hidden aria-label="Detection summary">
+    <div class="detail-head no-print">
+      <button type="button" class="btn ghost back" id="sumBack">← Back to detection</button>
+      <div class="dh-right"><button type="button" class="btn ghost" id="sumCopy">Copy as Markdown</button><button type="button" class="btn" id="sumPrint">Print or save as PDF</button></div>
+    </div>
+    <p class="hint no-print" role="status"></p>
+    <article class="summary" id="summaryBody"></article>
+  </section>
+
+  <section id="viewDetail" hidden aria-labelledby="detName">
+    <div class="detail-head">
+      <button type="button" class="btn ghost back" id="backBtn">← Overview</button>
+      <div class="dh-right"><button type="button" class="btn ghost" id="summaryBtn">Summary</button><select id="detSel" aria-label="Switch to another detection"></select></div>
+    </div>
+    <textarea id="detName" class="title-input" rows="1" placeholder="Name this detection, e.g. LSASS access by unsigned process" autocomplete="off" aria-label="Detection name"></textarea>
+  <ol class="rail" id="rail" role="tablist" aria-label="Life cycle stages"></ol>
+  <p class="next" id="nextAction" aria-live="polite"></p>
+
+  <div class="stage-head"><h2 id="stageTitle"></h2><p id="stagePurpose"></p></div>
+
+  <div class="layout">
+    <section id="stageBody" role="tabpanel"></section>
+    <aside class="panel" id="panel" aria-label="Stage status"></aside>
+    <div class="panel panel-full" id="panelFull" aria-label="Stage actions"></div>
+  </div>
+  <details class="history" id="historyBox"><summary>Change history <span class="cnt" id="historyCount"></span></summary>
+    <ol id="historyList"></ol><button type="button" class="btn ghost" id="historyMore" hidden>Show all</button>
+  </details>
+
+  </section>
+</div>
+
+
+<script>
+const L4 = (labels) => labels.map((l,i)=>({v:i+1,l}));
+
+const SCORING = {
+  prio:{
+    criteria:[
+      {id:'coverage',short:'Coverage',name:'Coverage',help:'How much of the technique and its variants would the detection catch?',opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'durability',short:'Durable',name:'Durability',help:'Will it survive tool updates, renamed binaries and small attacker changes?',opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'complexity',short:'Simple',name:'Complexity',help:'How hard is the logic to build, maintain and explain? Simpler scores higher.',opts:L4(['High','Medium','Low','Minimal'])},
+      {id:'confidence',short:'Confid.',name:'Confidence',help:'When it fires, how sure would you be that it is truly malicious?',opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'noise',short:'Quiet',name:'Noisiness',help:'Expected false positive volume in your environment.',opts:L4(['Very noisy','Noisy','Low noise','Silent precision'])},
+      {id:'action',short:'Action',name:'Actionable content',help:'Would the alert carry the context and next steps an analyst needs?',opts:L4(['Vague','Partial','Actionable','Fully guided'])},
+      {id:'cost',short:'Evasion',name:'Attacker cost',help:'What would it cost the attacker to evade this detection?',opts:L4(['Trivial bypass','Easy bypass','Costly bypass','Forces pivot'])},
+    ],
+    tiers:[
+      {min:.85,t:1,name:'P1, deploy immediately',advice:'High-value detection. Prioritise for immediate production deployment and playbook creation.'},
+      {min:.70,t:2,name:'P2, deploy next sprint',advice:'Solid value. Ship it in the next sprint cycle once it is built and tested.'},
+      {min:.50,t:3,name:'P3, deploy when capacity allows',advice:'Moderate value. Queue it behind P1 and P2 work, and look for a better angle on the weak criteria.'},
+      {min:0,t:4,name:'P4, do not deploy',advice:'Likely to cost more analyst time than it saves. Rethink the approach.'},
+    ]
+  },
+  triage:{
+    criteria:[
+      {id:'impact',short:'Impact',name:'Organizational impact',help:'How badly would the organization be hurt if this attack succeeded undetected?',opts:L4(['Minimal','Moderate','Significant','Critical'])},
+      {id:'relevance',short:'Relevance',name:'Organizational relevance',help:'Does this threat apply to your environment, industry and tech stack?',opts:L4(['Not relevant','Marginal','Relevant','Directly relevant'])},
+      {id:'wild',short:'In wild',name:'Exploit in the wild exists',help:'Is the technique or exploit being used by real adversaries right now?',opts:[{v:4,l:'Yes'},{v:1,l:'No'}]},
+      {id:'easy',short:'Easy',name:'Easy to execute',help:'If an exploit exists, can a low-skilled attacker run it reliably?',opts:[{v:4,l:'Yes'},{v:2,l:'No'}],dependsOn:'wild'},
+      {id:'time',short:'Effort',name:'Required time to build',help:'Effort to investigate, develop, test and tune the detection. Faster scores higher.',opts:L4(['> 2 weeks','1–2 weeks','1–3 days','< 1 day'])},
+    ],
+    tiers:[
+      {min:.85,t:1,name:'P1, build now',advice:'High value and feasible. Pull it into the current sprint.'},
+      {min:.70,t:2,name:'P2, build next sprint',advice:'Solid priority with manageable effort. Schedule in the next sprint cycle.'},
+      {min:.50,t:3,name:'P3, backlog',advice:'Worth doing eventually. Revisit when threat intel or scope changes.'},
+      {min:0,t:4,name:'P4, park it',advice:'Low return for the effort. Document why and park the idea.'},
+    ]
+  }
+};
+
+const STAGES = [
+  {id:'req',name:'Requirements Discovery',short:'Requirements',q:'How good would the detection be?',score:'prio',
+    purpose:'Capture the requirement, then score the detection idea itself with the prioritization dashboard.',
+    fields:true,
+    notesHint:'Context, links to reporting, hypotheses…'},
+  {id:'triage',name:'Triage',q:'How urgent is the threat?',score:'triage',
+    purpose:'Score the threat and the work with the triage dashboard, to decide when it gets built.',
+    notesHint:'Why it scored this way, sprint it was assigned to…'},
+  {id:'invest',name:'Investigation',q:'What does bad look like?',indicator:true,
+    purpose:'Before writing any rule, review the log source data you are actually getting and decide what the detection will key on.',
+    gate:'Move on when the data is there, parsed, and you know which events to match and which to exclude.',
+    notesHint:'Logging gaps you hit: missing endpoint agent, auditing switched off, field not parsed, no suitable source…',
+    groups:[
+      {title:'Log source review',gap:true,help:'Mark each check OK, Partial or Gap. Partial means it works for some of the estate, for example EDR on only part of the servers. Partials and gaps both land in the Data gaps list.',
+        gapLabels:['No visibility on the hosts or network','Auditing not enabled','Field missing or not parsed','No suitable log source','Retention too short'],
+        partialLabels:['Visibility on only part of the hosts or network','Auditing enabled on only some systems','Field parsed for only some sources','Log source available for only part of the scope','Retention too short on some sources'],
+        items:['Visibility exists on the hosts or network segments involved (e.g. an endpoint agent on the server holding the critical file)',
+               'Auditing is enabled for the activity, not just available (e.g. file access auditing actually configured)',
+               'Every field the logic needs is present and parsed. If not, write a parser or find another field',
+               'A suitable log source exists for the question (e.g. web proxy logs for banned-site AUP breaches)',
+               'Data is retained long enough to baseline and to investigate an alert']},
+      {title:'Technique and baseline',help:'Understand what bad looks like and what normal looks like in your environment.',
+        items:['Technique, variants and tooling studied from public reporting',
+               'Baseline of legitimate activity reviewed in your environment',
+               'Likely false positive sources listed',
+               'Approach chosen (signature, behaviour, anomaly or correlation)']}
+    ]},
+  {id:'dev',name:'Development',q:'Write the rule',
+    purpose:'Turn the investigation into a rule an analyst can act on.',
+    gate:'Move on when the rule is peer reviewed and in version control.',
+    items:['Query logic written and readable','Severity and risk score set','Alert carries the context fields an analyst needs','ATT&CK mapping and references added to rule metadata','Rule stored in version control (detection as code)','Peer reviewed']},
+  {id:'test',name:'Testing',q:'Does it work?',
+    purpose:'Prove it fires on the bad thing and stays quiet on everything else.',
+    gate:'Move on with a confirmed true positive and a realistic volume estimate. Send it back to Development if it fails.',
+    items:['True positive confirmed with emulation (Atomic Red Team or manual)','Variants and evasion attempts tested','Run against historical data to estimate alert volume','Query cost and schedule checked on the platform','Results and expected volume documented']},
+  {id:'deploy',name:'Deployment',q:'Ship it',
+    purpose:'Go live with everything the SOC needs on day one.',
+    gate:'Mark as deployed once it is live and analysts know how to handle it.',
+    items:['Response playbook written and linked from the alert','Analysts briefed on what the alert means','Deployed to production, staged or preview mode first if possible','Alert routing and severity confirmed in the SOC queue','Coverage map updated','Owner and review cadence agreed for tuning']},
+  {id:'depr',name:'Deprecation',short:'Deprecate',q:'Optional',optional:true,
+    purpose:'Optional. Retire a deployed rule on purpose, so no coverage gap opens by accident.',
+    gate:'Complete it once the rule is off and nothing depends on it. You can restore it later.',
+    notesHint:'Why it is being retired, who agreed, what covers it now…',
+    items:['Reason documented and agreed with the owner','Coverage checked: a replacement is live, or the gap is accepted','Rule disabled in production','Rule archived in version control with the reason','Playbook and coverage map updated','SOC informed']},
+];
+STAGES.forEach(s=>{ if(s.groups) s.items=s.groups.flatMap(g=>g.items); });
+
+// Indicator types, ordered by the Pyramid of Pain (David Bianco): higher means more painful for the attacker to change
+const INDICATORS=[
+  {id:'hash',name:'Hash values',pain:'Trivial to change',l:1,ex:'SHA256 of a dropper'},
+  {id:'ip',name:'IP addresses',pain:'Easy to change',l:1,ex:'C2 server address'},
+  {id:'domain',name:'Domain names',pain:'Simple to change',l:2,ex:'Phishing or C2 domain'},
+  {id:'artifact',name:'Network / host artifacts',pain:'Annoying to change',l:3,ex:'Registry key, URI pattern, user agent, named pipe'},
+  {id:'tool',name:'Tools',pain:'Challenging to change',l:3,ex:'Mimikatz, Cobalt Strike, Rubeus behaviour'},
+  {id:'ttp',name:'TTPs',pain:'Tough to change',l:4,ex:'LSASS memory access, Kerberoasting, OAuth consent abuse'},
+];
+const indOf=(d)=>INDICATORS.find(x=>x.id===d.indicator);
+
+const TACTICS=[
+  ['TA0043','Reconnaissance'],['TA0042','Resource Development'],['TA0001','Initial Access'],['TA0002','Execution'],
+  ['TA0003','Persistence'],['TA0004','Privilege Escalation'],['TA0005','Defense Evasion'],['TA0006','Credential Access'],
+  ['TA0007','Discovery'],['TA0008','Lateral Movement'],['TA0009','Collection'],['TA0011','Command and Control'],
+  ['TA0010','Exfiltration'],['TA0040','Impact']];
+const SOURCES=['Threat intel','Incident','Red or purple team','Audit or compliance','Coverage gap','Other'];
+const SOURCE_HELP={
+  'Threat intel':'A report or advisory about a technique or actor',
+  'Incident':'Something happened, or nearly happened, that we did not catch',
+  'Red or purple team':'An exercise showed the activity went unseen',
+  'Audit or compliance':'An auditor, regulation or policy requires it',
+  'Coverage gap':'Our own review found a technique we do not cover',
+  'Other':'Anything else, explain in the notes'};
+const MEASURED=['coverage','confidence','noise','cost'];   // criteria Testing can actually measure
+const metaOf=(d)=>d.meta||(d.meta={source:'',owner:'',techniques:'',dataSources:'',tactics:[]});
+const splitList=(str)=>(str||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+const TECH_RE=/^T\d{4}(\.\d{3})?$/;
+const techs=(d)=>splitList(metaOf(d).techniques).map(x=>x.toUpperCase());
+function missingMeta(d){
+  const m=metaOf(d), out=[];
+  if(!m.source) out.push('trigger'); if(!m.owner.trim()) out.push('owner');
+  if(!m.tactics.length) out.push('tactic'); if(!techs(d).length) out.push('technique');
+  if(!splitList(m.dataSources).length) out.push('data sources');
+  return out;
+}
+function adjusted(d){
+  // Prioritization re-computed with measured values substituted in
+  const ms=d.measured||{}; if(!MEASURED.some(k=>ms[k]!=null)) return null;
+  const copy={...d,scores:{...d.scores,prio:{...d.scores.prio,...Object.fromEntries(Object.entries(ms).filter(([,v])=>v!=null))}}};
+  return compute(copy,'prio');
+}
+
+const IDX = Object.fromEntries(STAGES.map((s,i)=>[s.id,i]));
+const DEV = IDX.dev, TEST = IDX.test, DEPLOY = IDX.deploy, DEPR = IDX.depr, LAST = STAGES.length-1;
+const DEPR_REASONS=['Replaced by a better detection','Threat no longer relevant','Data source retired','Too noisy to tune','Platform or schema change','Other'];
+
+let uid = 0;
+function isBlank(d){ return !d.name.trim()&&!Object.keys(d.scores.prio).length&&!Object.keys(d.scores.triage).length&&!d.stage&&!d.deployed&&!metaOf(d).owner&&!metaOf(d).tactics.length&&!metaOf(d).techniques; }
+function newUid(){ const a=new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a,b=>b.toString(16).padStart(2,'0')).join(''); }
+function newDetection(name=''){
+  return {id:++uid,uid:newUid(),updatedAt:null,updatedBy:'',baseAt:'',name,stage:0,deployed:false,rule:'',reviewedAt:null,reviews:[],cadence:null,deprecated:false,deprecatedAt:null,depr:{reason:'',replacement:''},indicator:null,gapNotes:{},created:new Date().toISOString(),enteredAt:Date.now(),spent:{},dates:{},deployedAt:null,measured:{},meta:{source:'',owner:'',techniques:'',dataSources:'',tactics:[]},scores:{triage:{},prio:{}},checks:{},notes:{},loops:0};
+}
+const state = {screen:'overview',tombs:[],dets:[newDetection()],cur:0,view:0,tab:'pipe',settings:{gates:true,cadence:90,showDep:true,me:'',lastShared:''}};
+const $ = (id)=>document.getElementById(id);
+const det = ()=>state.dets[state.cur];
+const esc = (s)=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const label = (d)=>d.name.trim()||'Untitled detection';
+
+function isDisabled(c,s){return c.dependsOn && s[c.dependsOn]===1}
+function effective(d,mode){
+  const s={...d.scores[mode]};
+  SCORING[mode].criteria.forEach(c=>{ if(isDisabled(c,s)) s[c.id]=1; });
+  return s;
+}
+// Gates: hard rules that cap the tier whatever the total says
+const GATES={
+  triage:[
+    {test:s=>s.relevance===1,cap:4,reason:'Not relevant to the organization'},
+    {test:s=>s.impact===1&&s.wild===1,cap:3,reason:'Minimal impact and no exploit in the wild'},
+  ],
+  prio:[
+    {test:s=>s.confidence===1,cap:3,reason:'Low confidence that a hit is malicious'},
+    {test:s=>s.noise===1,cap:3,reason:'Very noisy'},
+    {test:s=>s.cost===1&&s.durability===1,cap:3,reason:'Trivial to bypass and not durable'},
+  ]
+};
+function compute(d,mode){
+  const crit=SCORING[mode].criteria, s=effective(d,mode), max=crit.length*4;
+  const rated=crit.filter(c=>s[c.id]!=null).length, total=crit.reduce((a,c)=>a+(s[c.id]||0),0);
+  const complete=rated===crit.length;
+  let tier=complete?SCORING[mode].tiers.find(t=>total/max>=t.min):null, gated=null;
+  if(tier && state.settings.gates){
+    const hits=GATES[mode].filter(g=>g.test(s));
+    const cap=Math.max(0,...hits.map(g=>g.cap));
+    if(cap>tier.t){ gated={from:tier,reasons:hits.filter(g=>g.cap>tier.t).map(g=>g.reason)}; tier=SCORING[mode].tiers.find(t=>t.t===cap); }
+  }
+  return {total,max,rated,complete,s,tier,gated};
+}
+function checkProgress(d,stage){
+  const arr=d.checks[stage.id]||[]; const done=stage.items.filter((_,i)=>arr[i]===true).length;
+  return {done,total:stage.items.length};
+}
+function overallChecks(d){
+  let done=0,total=0;
+  STAGES.filter(s=>s.items&&!s.optional).forEach(s=>{const p=checkProgress(d,s);done+=p.done;total+=p.total});
+  return {done,total};
+}
+function gapsOf(d){
+  const st=STAGES[IDX.invest], arr=d.checks.invest||[]; let off=0, out=[];
+  st.groups.forEach(g=>{ if(g.gap) g.items.forEach((_,j)=>{const k=off+j; if(arr[k]==='gap'||arr[k]==='partial') out.push({k,kind:arr[k],label:arr[k]==='gap'?g.gapLabels[j]:g.partialLabels[j],note:(d.gapNotes||{})[k]||''});}); off+=g.items.length; });
+  return out;
+}
+const DAY=864e5;
+function fmtDur(ms){ const dd=ms/DAY; if(dd<1) return 'under a day'; const n=Math.round(dd); return `${n} day${n>1?'s':''}`; }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString(undefined,{day:'numeric',month:'short'}); }
+function isCur(d,i){ return !d.deprecated && i===d.stage && (!d.deployed || i===DEPR); }
+function isDone(d,i){ return d.deprecated ? i!==DEPR || !!d.dates.depr : (i<d.stage && i!==DEPR) || (d.deployed && i<=DEPLOY); }
+function spentIn(d,id){ return (d.spent[id]||0) + (isCur(d,d.stage) && STAGES[d.stage].id===id ? Date.now()-d.enteredAt : 0); }
+function leave(d){ const id=STAGES[d.stage].id; d.spent[id]=(d.spent[id]||0)+(Date.now()-d.enteredAt); d.enteredAt=Date.now(); }
+function median(a){ if(!a.length) return null; const b=[...a].sort((x,y)=>x-y), m=b.length>>1; return b.length%2?b[m]:(b[m-1]+b[m])/2; }
+const CADENCES=[30,60,90,180,365];
+const cadenceOf=(d)=>d.cadence||state.settings.cadence;
+function reviewDue(d){
+  if(!d.deployed||d.deprecated) return null;
+  const base=d.reviewedAt||d.deployedAt; if(!base) return null;
+  return new Date(new Date(base).getTime()+cadenceOf(d)*DAY);
+}
+function dueText(due){
+  const diff=due-Date.now(), n=Math.round(Math.abs(diff)/DAY);
+  return diff<0 ? `overdue by ${n} day${n===1?'':'s'}` : n===0 ? 'due today' : `due in ${n} day${n===1?'':'s'}`;
+}
+// One answer to "what should happen next" for each detection. order drives the pipeline ranking.
+function nextAction(d){
+  const A=(label,t,order,why)=>({label,t,order,why});
+  if(d.deprecated) return A('Deprecated',0,14,'Retired and no longer counted in coverage.');
+  if(d.stage===DEPR) return A('Finish deprecation',0,10,'Deprecation has started but is not complete.');
+  if(d.deployed){
+    const due=reviewDue(d), h=health(d);
+    if(h && h.order===0) return A(h.label,h.t,h.order,h.why);
+    if(due && due<Date.now()) return A('Review overdue',4,1,`Last reviewed ${fmtDate(d.reviewedAt||d.deployedAt)}. Reviews are every ${cadenceOf(d)} days.`);
+    if(h) return A(h.label,h.t,h.order,h.why);
+    if(due && due-Date.now()<LIMITS.dueSoonDays*DAY) return A('Review due soon',3,6,`Next review ${fmtDate(due.toISOString())}, within ${LIMITS.dueSoonDays} days.`);
+    return A('Live',2,11,(due?`Next review ${fmtDate(due.toISOString())}.`:'Deployed.')+(partials(d).length?' Sees only part of the estate (partial data).':''));
+  }
+  const p=compute(d,'prio'), adj=adjusted(d), pv=(adj&&adj.complete)?adj:p, t=compute(d,'triage');
+  if(!p.complete) return A('Score the requirement',0,8,'Requirements Discovery is not fully scored yet.');
+  if(pv.tier.t===4) return A('Rethink the requirement',4,12,`Prioritization is ${pv.tier.name}. A detection here is unlikely to be worth the analyst time.`);
+  if(!t.complete) return A('Triage it',0,7,'Prioritization is done. Score Triage to decide when to build.');
+  if(t.tier.t===4) return A('Parked',0,13,`Triage is ${t.tier.name}.`);
+  if(hardGaps(d).length) return A('Fix data gaps',4,4,`${hardGaps(d).length} log source gap${hardGaps(d).length>1?'s':''} recorded in Investigation.`);
+  const ms=d.measured||{};
+  if(d.stage===TEST && MEASURED.some(k=>ms[k]!=null&&d.scores.prio[k]!=null&&d.scores.prio[k]-ms[k]>=2))
+    return A('Send back to Development',3,3,'Testing measured at least one criterion 2 or more below prediction.');
+  const o=Math.max(pv.tier.t,t.tier.t), pair=`Detection value ${pv.tier.name.split(',')[0]}${pv===adj?' (measured)':''} from prioritization, threat urgency ${t.tier.name.split(',')[0]} from triage. The slower of the two sets the pace.${partials(d).length?' Data is only partly available, so it will see part of the estate.':''}`;
+  if(o===1) return A('Build now',1,2,pair);
+  if(o===2) return A('Build next sprint',2,5,pair);
+  return A('Backlog',3,9,pair);
+}
+function setDate(d,key,val){
+  if(!val) return;                                   // ignore cleared inputs, a date is always needed
+  const iso=new Date(val+'T12:00:00').toISOString();
+  d[key]=iso; if(key==='deployedAt') d.dates.deploy=iso;
+}
+const hardGaps=(d)=>gapsOf(d).filter(g=>g.kind==='gap');
+const partials=(d)=>gapsOf(d).filter(g=>g.kind==='partial');
+function gapSummary(d){
+  const h=hardGaps(d).length, pp=partials(d).length;
+  return [h&&`${h} gap${h>1?'s':''}`, pp&&`${pp} partial`].filter(Boolean).join(', ');
+}
+// Only plain web links become clickable, so a shared file can never inject a script link
+const safeUrl=(u)=>/^https?:\/\/[^\s"'<>]+$/i.test((u||'').trim())?(u||'').trim():null;
+function ruleHtml(d,cls=''){
+  if(!d.rule||!d.rule.trim()) return '';
+  const u=safeUrl(d.rule);
+  return u?`<a class="rule-link ${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Open rule ↗</a>`:`<span class="${cls}">Rule: ${esc(d.rule.trim())}</span>`;
+}
+const lastReview=(d)=>[...(d.reviews||[])].sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:0).pop()||null;
+const precision=(r)=>r&&r.alerts>0&&r.tp!=null?r.tp/r.alerts:null;
+const lastMeasured=(d)=>[...(d.reviews||[])].filter(r=>precision(r)!=null).sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:0).pop()||null;   // latest review with alert numbers
+function health(d){
+  const r=lastReview(d); if(!r) return null;
+  const when=fmtDate(r.at), pr=precision(r);
+  if(r.test==='failed') return {label:'Fix broken rule',t:4,order:0,why:`The test failed at the review on ${when}.`};
+  const fw=fpPerWeek(d,r);
+  if(fw!=null && fw>LIMITS.fpPerWeek) return {label:'Tune false positives',t:3,order:3,why:`About ${fmtRate(fw)} false positives per week at the review on ${when}, above the limit of ${LIMITS.fpPerWeek} per week. ${Math.round(pr*100)}% of ${r.alerts} alerts were real.`};
+  if(r.alerts===0 && r.test!=='passed') return {label:'Check it still fires',t:3,order:4,why:`No alerts at the review on ${when} and the test was not re-run. Make sure the data still arrives.`};
+  return null;
+}
+// Thresholds behind the flags. Shown in the text wherever they apply.
+const LIMITS={fpPerWeek:5, dueSoonDays:14, shareDays:2};
+// Production noise judged on false positives per week, the analyst cost the noisiness score is about
+const NOISE_BANDS=[{max:1,v:4,l:'Silent precision'},{max:5,v:3,l:'Low noise'},{max:20,v:2,l:'Noisy'},{max:Infinity,v:1,l:'Very noisy'}];
+const noiseBand=(fpw)=>NOISE_BANDS.find(b=>fpw<b.max)||NOISE_BANDS[3];
+function fpPerWeek(d,r){
+  if(!r||r.alerts==null||r.tp==null) return null;
+  const prev=[...d.reviews].filter(x=>x.at<r.at).sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:0).pop();
+  const from=prev?prev.at:(d.deployedAt||d.created);
+  const weeks=Math.max(1,(new Date(r.at)-new Date(from))/(7*DAY));   // at least one week, so early reviews are not exaggerated
+  return (r.alerts-r.tp)/weeks;
+}
+const fmtRate=(x)=>x<10?(Math.round(x*10)/10).toString():Math.round(x).toString();
+function stageProgress(d){
+  if(d.deprecated) return '';
+  if(d.deployed && d.stage!==DEPR) return d.reviews.length?`${d.reviews.length} review${d.reviews.length>1?'s':''} logged`:'No reviews yet';
+  const st=STAGES[d.stage];
+  if(st.score){ const r=compute(d,st.score); return `${r.rated}/${SCORING[st.score].criteria.length} criteria scored`; }
+  const pp=checkProgress(d,st); return `${pp.done}/${pp.total} checklist items`;
+}
+function stageLabel(d){ return d.deprecated ? 'Deprecated' : d.stage===DEPR ? 'Deprecating' : d.deployed ? 'Deployed' : STAGES[d.stage].name; }
+
+function renderPicker(){
+  $('detSel').innerHTML=state.dets.map((d,i)=>`<option value="${i}" ${i===state.cur?'selected':''}>${esc(label(d))} (${stageLabel(d)})</option>`).join('');
+  if(document.activeElement!==$('detName')) $('detName').value=det().name;
+}
+
+function renderRail(){
+  const d=det();
+  const w = (d.deprecated||d.stage===DEPR) ? 85.714 : (d.deployed ? 1 : Math.min(d.stage,DEPLOY)/DEPLOY)*71.428;
+  $('rail').innerHTML=`<span class="fill" style="width:${w}%"></span>`+STAGES.map((s,i)=>{
+    const done = isDone(d,i), current = isCur(d,i);
+    const cls=['stop',done?'done':'',current?'current':'',s.score?'scored':'',s.optional?'optional':''].join(' ');
+    return `<li style="display:contents"><button class="${cls}" role="tab" data-i="${i}" aria-selected="${i===state.view}" ${current?'aria-current="step"':''}>
+      <span class="dot">${done?'✓':i+1}</span><b>${s.short||s.name}</b><small>${done&&d.dates[s.id]?`Done ${fmtDate(d.dates[s.id])}`:s.q}</small></button></li>`;
+  }).join('');
+  const rail=$('rail'), sel=rail.querySelector('[aria-selected="true"]');
+  if(sel && rail.scrollWidth>rail.clientWidth) rail.scrollLeft=sel.offsetLeft-rail.clientWidth/2+sel.offsetWidth/2;
+}
+
+function renderStage(){
+  const d=det(), s=STAGES[state.view];
+  $('stageTitle').textContent=`${state.view+1}. ${s.name}`;
+  $('stagePurpose').textContent=s.purpose;
+  let html='';
+  if(s.score){
+    const isP=s.score==='prio';
+    html+=`<div class="explain">
+      <div class="${isP?'on':''}"><b>Prioritization</b><span>Scores the <em>detection</em>: would it catch the attack, keep working, stay quiet and help the analyst?</span><span class="out">Answers: how valuable is it to ship?</span></div>
+      <div class="${isP?'':'on'}"><b>Triage</b><span>Scores the <em>threat and the work</em>: how much harm, how relevant to us, is it used now, how much effort?</span><span class="out">Answers: when do we build it?</span></div>
+      <p>You need both. A great detection for a threat that does not affect you can wait. An urgent threat with a weak detection idea needs a better idea first. The slower of the two sets the pace.</p>
+    </div>`;
+  }
+  if(s.fields){
+    const m=metaOf(d), bad=techs(d).filter(t=>!TECH_RE.test(t));
+    html+=`<h3 class="group-title">Requirement details</h3>
+      <p class="group-help">These feed the pipeline filters, the ATT&amp;CK coverage view and the exports.</p>
+      <div class="meta">
+        <div class="mf"><label for="m-source">What triggered this?</label><select id="m-source" data-m="source"><option value="">Choose…</option>${SOURCES.map(x=>`<option ${m.source===x?'selected':''}>${x}</option>`).join('')}</select>
+          <small id="srcHelp">${m.source?SOURCE_HELP[m.source]:'Why we need this detection in the first place'}</small></div>
+        <div class="mf"><label for="m-created">Requested on</label><input id="m-created" type="date" data-date="created" value="${d.created.slice(0,10)}"></div>
+        <div class="mf"><label for="m-owner">Owner</label><input id="m-owner" data-m="owner" type="text" placeholder="Who drives this detection" value="${esc(m.owner)}"></div>
+        <div class="mf full"><span class="lab" id="tac-l">Tactics</span><div class="tactics" role="group" aria-labelledby="tac-l">${TACTICS.map(([id,n])=>`<button class="tac" data-tac="${id}" aria-pressed="${m.tactics.includes(id)}">${n}</button>`).join('')}</div></div>
+        <div class="mf"><label for="m-tech">ATT&amp;CK technique IDs</label><input id="m-tech" data-m="techniques" type="text" placeholder="T1003.001, T1558.003" value="${esc(m.techniques)}">
+          <small id="techHint" class="${bad.length?'bad':''}">${bad.length?`Not a technique ID: ${esc(bad.join(', '))}`:'Comma separated, e.g. T1003 or T1003.001'}</small></div>
+        <div class="mf"><label for="m-ds">Data sources</label><input id="m-ds" data-m="dataSources" type="text" placeholder="Sysmon, Windows Security, Elastic Defend" value="${esc(m.dataSources)}"><small>Comma separated</small></div>
+      </div>
+      <h3 class="group-title">Prioritization: how good would the detection be?</h3><p class="group-help">Testing will later re-check the four criteria it can measure: coverage, confidence, noisiness and attacker cost.</p>`;
+  }
+  if(s.score){
+    const sc=d.scores[s.score], eff=effective(d,s.score);
+    html+=SCORING[s.score].criteria.map(c=>{
+      const dis=isDisabled(c,sc), val=eff[c.id], cols=c.opts.length===2?'c2':'c4';
+      return `<div class="crit">
+        <div class="crit-head"><h3 id="h-${c.id}">${c.name}</h3><span class="val">${val??'–'} / 4</span></div>
+        <p>${c.help}</p>
+        <div class="opts ${cols}" role="group" aria-labelledby="h-${c.id}">
+          ${c.opts.map(o=>`<button class="opt" data-c="${c.id}" data-v="${o.v}" data-l="${o.v}" aria-pressed="${sc[c.id]===o.v&&!dis}" ${dis?'disabled':''}>
+            ${c.opts.length===4?`<span class="pts">${o.v}</span>`:''}<span class="lbl">${o.l}</span></button>`).join('')}
+        </div>
+        ${dis?'<div class="note">No known exploit, so this scores 1.</div>':''}
+      </div>`;
+    }).join('');
+  }else{
+    const arr=d.checks[s.id]||[];
+    const gapList=(g,offset)=>`<ul class="checks">${g.items.map((it,j)=>{const k=j+offset, v=arr[k];
+      return `<li class="lsrow"><span>${esc(it)}</span><span class="seg" role="group" aria-label="Status"><button data-ls="${k}" data-v="ok" aria-pressed="${v===true}">OK</button><button data-ls="${k}" data-v="partial" aria-pressed="${v==='partial'}">Partial</button><button data-ls="${k}" data-v="gap" aria-pressed="${v==='gap'}">Gap</button></span>
+        ${v==='gap'||v==='partial'?`<input class="gapnote ${v}" data-gn="${k}" type="text" aria-label="${v==='gap'?'What is missing':'How much is covered'}" placeholder="${v==='gap'?"What's missing? e.g. no Sysmon on the file servers":'How much is covered? e.g. Elastic Defend on about 60% of servers'}" value="${esc((d.gapNotes||{})[k]||'')}">`:''}</li>`}).join('')}</ul>`;
+    const list=(items,offset)=>`<ul class="checks">${items.map((it,j)=>{const i=j+offset;return `<li><label><input type="checkbox" data-k="${i}" ${arr[i]?'checked':''}><span>${esc(it)}</span></label></li>`}).join('')}</ul>`;
+    if(s.indicator){
+      html+=`<h3 class="group-title" id="ind-h">Indicator type</h3>
+        <p class="group-help">What will the rule key on? Ordered by how painful it is for the attacker to change.</p>
+        <div class="inds" role="group" aria-labelledby="ind-h">${INDICATORS.map(x=>`<button class="ind" data-ind="${x.id}" data-l="${x.l}" aria-pressed="${d.indicator===x.id}">
+          <b>${x.name}</b><span class="pain">${x.pain}</span><small>${esc(x.ex)}</small></button>`).join('')}</div>`;
+    }
+    if(s.groups){
+      let off=0;
+      s.groups.forEach(g=>{ html+=`<h3 class="group-title">${g.title}</h3><p class="group-help">${g.help}</p>`+(g.gap?gapList(g,off):list(g.items,off)); off+=g.items.length; });
+    }else html=list(s.items,0);
+    if(s.id==='dev'){
+      html=`<div class="meta"><div class="mf full"><label for="rule-in">Where the rule lives</label>
+        <input id="rule-in" type="text" data-rule placeholder="Link to the rule in your repo or SIEM, or its rule ID" value="${esc(d.rule||'')}">
+        <small>A web link becomes clickable in the pipeline. Anything else is shown as the rule ID.</small></div></div>
+        <h3 class="group-title">Checklist</h3>`+html;
+    }
+    if(s.id==='deploy' && d.deployed){
+      const today=new Date().toISOString().slice(0,10);
+      const hist=d.reviews.map((r,k)=>({r,k})).sort((a,b)=>(a.r.at<b.r.at?1:a.r.at>b.r.at?-1:b.k-a.k)).map(x=>x.r);   // newest first, same-day reviews in the order logged
+      const prc=(r)=>{const v=precision(r); if(v==null) return '–'; const c=v<0.2?'rv-bad':v<0.6?'rv-mid':'rv-good'; return `<span class="${c}">${Math.round(v*100)}%</span>`;};
+      const tst=(t)=>t==='passed'?'<span class="rv-good">Passed</span>':t==='failed'?'<span class="rv-bad">Failed</span>':'–';
+      html=`<h3 class="group-title">Reviews</h3>
+        <p class="group-help">Record how the rule really performs. A failed test, mostly false positives, or silence without a re-test gets flagged in Next action.</p>
+        <div class="meta">
+          <div class="mf"><label for="rv-at">Review date</label><input id="rv-at" type="date" value="${today}"></div>
+          <div class="mf"><label for="rv-test">Test re-run</label><select id="rv-test"><option value="">Not run</option><option value="passed">Passed</option><option value="failed">Failed</option></select></div>
+          <div class="mf"><label for="rv-alerts">Alerts since last review</label><input id="rv-alerts" type="number" min="0" inputmode="numeric" placeholder="e.g. 40"></div>
+          <div class="mf"><label for="rv-tp">True positives</label><input id="rv-tp" type="number" min="0" inputmode="numeric" placeholder="e.g. 12"></div>
+          <div class="mf full"><label for="rv-note">Note</label><input id="rv-note" type="text" placeholder="Tuning done, exclusions added, anything odd…"></div>
+        </div>
+        <div class="actions"><button type="button" class="btn" data-rv-save>Save review</button></div>
+        ${hist.length?`<div class="table-wrap" style="margin-top:14px"><table class="rv-table"><thead><tr><th>Date</th><th>Alerts</th><th>True positives</th><th>Real alerts</th><th>False / week</th><th>Test</th><th>By</th><th>Note</th></tr></thead><tbody>
+          ${hist.map(r=>`<tr><td>${fmtDate(r.at)}</td><td>${r.alerts??'–'}</td><td>${r.tp??'–'}</td><td>${prc(r)}</td><td>${(fw=>fw==null?'–':`<span class="${noiseBand(fw).v<=1?'rv-bad':noiseBand(fw).v===2?'rv-mid':''}">${fmtRate(fw)}</span>`)(fpPerWeek(d,r))}</td><td>${tst(r.test)}</td><td>${esc(r.by||'')}</td><td class="note">${esc(r.note||'')}</td></tr>`).join('')}
+        </tbody></table></div>`:''}
+        <h3 class="group-title" style="margin-top:28px">Deployment checklist</h3>`+html;
+    }
+    if(s.id==='depr'){
+      const others=state.dets.filter(x=>x!==d);
+      html=`<h3 class="group-title">Why it is retired</h3>
+        <div class="meta">
+          <div class="mf"><label for="dp-reason">Reason</label><select id="dp-reason" data-dp="reason"><option value="">Choose…</option>${DEPR_REASONS.map(r=>`<option ${d.depr.reason===r?'selected':''}>${r}</option>`).join('')}</select></div>
+          <div class="mf"><label for="dp-rep">Replaced by</label><select id="dp-rep" data-dp="replacement"><option value="">Nothing, gap accepted</option>${others.map(x=>`<option value="${x.uid}" ${d.depr.replacement===x.uid?'selected':''}>${esc(label(x))}</option>`).join('')}</select></div>
+        </div>
+        <h3 class="group-title">Checklist</h3>`+html;
+    }
+    if(s.id==='test'){
+      const ms=d.measured||{}, pr=d.scores.prio;
+      html+=`<h3 class="group-title">Predicted vs measured</h3>
+        <p class="group-help">Re-score what testing actually showed. The prediction comes from Requirements Discovery, made before anything was built.</p>`;
+      html+=MEASURED.map(id=>{
+        const c=SCORING.prio.criteria.find(x=>x.id===id), pv=pr[id], mv=ms[id];
+        return `<div class="crit">
+          <div class="crit-head"><h3 id="mh-${id}">${c.name}</h3>${deltaPill(pv,mv)}</div>
+          <p class="pred">Predicted: ${pv?`${pv}, ${c.opts[pv-1].l}`:'not scored'}</p>
+          <div class="opts c4" role="group" aria-labelledby="mh-${id}">${c.opts.map(o=>`<button class="opt" data-mc="${id}" data-v="${o.v}" data-l="${o.v}" aria-pressed="${mv===o.v}"><span class="pts">${o.v}</span><span class="lbl">${o.l}</span></button>`).join('')}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+  html+=`<div class="notes"><label for="notes">Notes for ${s.name.toLowerCase()}</label>
+    <textarea id="notes" placeholder="${esc(s.notesHint||'Links, decisions, query snippets, test results…')}">${esc(d.notes[s.id]||'')}</textarea></div>`;
+  $('stageBody').innerHTML=html;
+}
+
+function deltaPill(pv,mv){
+  if(mv==null) return '<span class="delta eq">Not measured</span>';
+  if(pv==null) return '<span class="delta eq">No prediction</span>';
+  const dd=mv-pv;
+  return dd===0?'<span class="delta eq">As predicted</span>':dd>0?`<span class="delta up">${dd} better than predicted</span>`:`<span class="delta down">${-dd} worse than predicted</span>`;
+}
+// For deployed or deprecated rules the panel leads with how the rule is doing, not with stage paperwork
+function statusBlock(d,top=true){
+  if(d.deprecated){
+    const rep=state.dets.find(x=>x.uid===d.depr.replacement);
+    return `<div class="${top?'panel-top ':''}status-top"><p class="eyebrow">Retired</p><p class="tier" data-t="0">Deprecated</p>
+      <p class="advice">${d.deprecatedAt?`Since ${fmtDate(d.deprecatedAt)}.`:''}${d.depr.reason?` ${esc(d.depr.reason)}.`:''}${rep?` Replaced by ${esc(label(rep))}.`:''}</p></div>`;
+  }
+  const a=nextAction(d), due=reviewDue(d), r=lastReview(d);
+  const last=r?`Last review ${fmtDate(r.at)}${r.alerts!=null?`: ${r.alerts} alert${r.alerts===1?'':'s'}`:''}${(fw=>fw!=null?`, ${fmtRate(fw)} false per week`:'')(fpPerWeek(d,r))}${r.test?`, test ${r.test}`:''}.`:'No reviews logged yet.';
+  return `<div class="${top?'panel-top ':''}status-top"><p class="eyebrow">${d.stage===DEPR?'Deprecation in progress':'Live'}${d.deployedAt?` since ${fmtDate(d.deployedAt)}`:''}</p>
+    <p class="tier" data-t="${a.t}">${a.label}</p>
+    <p class="advice">${due?`Next review ${dueText(due)}. `:''}${last}</p></div>`;
+}
+function renderPanel(){
+  const d=det(), i=state.view, s=STAGES[i];
+  let html='';
+  if(s.score){
+    const r=compute(d,s.score), crit=SCORING[s.score].criteria, cols=`repeat(${crit.length},1fr)`;
+    const left=crit.length-r.rated;
+    html+=`<div class="panel-top"><div class="total">${r.total}<span> / ${r.max}</span></div>
+      <p class="tier" data-t="${r.tier?r.tier.t:0}">${r.tier?r.tier.name:(r.rated?`${left} left to rate`:'Not rated yet')}</p>
+      <p class="advice">${r.tier?r.tier.advice:'The tier appears once every criterion has a value.'}</p></div>
+      ${(()=>{ const T=SCORING[s.score].tiers, cut=T.slice(0,3).map(t=>({t:t.t,at:Math.ceil(t.min*r.max-1e-9)}));
+        let next='';
+        if(r.complete){ const raw=T.find(t=>r.total/r.max>=t.min); const up=cut.find(c=>c.t===raw.t-1);
+          next = r.gated ? ' A gate caps the tier, so more points will not lift it until the gate no longer applies.'
+               : up ? ` ${up.at-r.total} more point${up.at-r.total>1?'s reach':' reaches'} P${up.t}.` : ' This is the top tier.'; }
+        return `<p class="advice">Tiers: ${cut.map(c=>`P${c.t} from ${c.at}`).join(', ')}, P4 below, out of ${r.max}.${next}</p>`; })()}
+      <div class="strip"><div class="cells" style="grid-template-columns:${cols}">${crit.map(c=>`<div class="cell" ${r.s[c.id]?`data-l="${r.s[c.id]}"`:''} title="${c.name}: ${r.s[c.id]??'not rated'}"></div>`).join('')}</div>
+      <div class="strip-legend" style="grid-template-columns:${cols}">${crit.map(c=>`<span>${c.short}</span>`).join('')}</div></div>`;
+    if(r.gated) html+=`<p class="warn">Capped at ${r.tier.name.split(',')[0]} by a gate: ${r.gated.reasons.join('; ').toLowerCase()}. The total alone would give ${r.gated.from.name.split(',')[0]}.</p>`;
+    html+=`<details class="gates"><summary>Scoring gates</summary><ul>${GATES[s.score].map(g=>`<li class="${state.settings.gates&&r.complete&&g.test(r.s)?'hit':''}">${g.reason}: at most P${g.cap}</li>`).join('')}</ul></details>
+      <label class="gtoggle"><input type="checkbox" data-gates ${state.settings.gates?'checked':''}> Apply gates to all detections</label>`;
+    if(s.fields){ const miss=missingMeta(d); html+=miss.length?`<p class="missing">Details missing: <b>${miss.join(', ')}</b></p>`:`<p class="missing">All requirement details filled in.</p>`; }
+  }else{
+    const p=checkProgress(d,s);
+    let indHtml='';
+    if(s.indicator){
+      const x=indOf(d);
+      indHtml = x ? `<p class="ind-line">Keys on <b>${x.name}</b>, ${x.pain.toLowerCase()}.</p>` : `<p class="ind-line">No indicator type chosen yet.</p>`;
+      const cost=d.scores.prio.cost, dur=d.scores.prio.durability;
+      if(x && x.l===1 && ((cost||0)>=3 || (dur||0)>=3))
+        indHtml+=`<p class="warn">Requirements rated durability or attacker cost 3+, but ${x.name.toLowerCase()} are ${x.pain.toLowerCase()}. Revisit the score or aim higher on the pyramid.</p>`;
+    }
+    if((d.deployed||d.deprecated) && !isCur(d,i)){
+      html+=statusBlock(d)+`<p class="small-line">${s.name} checklist: ${p.done} of ${p.total} ticked.</p>`;
+    }else html+=indHtml+`<div class="panel-top"><div class="total">${p.done}<span> / ${p.total} done</span></div>${s.id==='invest'&&gapsOf(d).length?`<p class="ind-line gapcount" ${hardGaps(d).length?'':'style="color:var(--l2)"'}>${gapSummary(d)} recorded</p>`:''}</div>
+      <div class="strip"><div class="cells" style="grid-template-columns:repeat(${p.total},1fr)">${s.items.map((_,k)=>{const v=(d.checks[s.id]||[])[k];return `<div class="cell ${v===true?'on':v==='gap'?'gap':v==='partial'?'partial':''}"></div>`}).join('')}</div></div>
+      ${isDone(d,i)?'':`<p class="gate">${s.gate}</p>`}`;
+    if(s.id==='test'){
+      const a=adjusted(d), pr=compute(d,'prio'), ms=d.measured||{};
+      const worse=MEASURED.filter(k=>ms[k]!=null&&d.scores.prio[k]!=null&&d.scores.prio[k]-ms[k]>=2).map(k=>SCORING.prio.criteria.find(c=>c.id===k).name.toLowerCase());
+      if(a&&pr.complete) html+=`<p class="ind-line">With what testing measured, prioritization is <b>${a.total}/${a.max}, ${a.tier.name}</b> (predicted ${pr.total}/${pr.max}).</p>`;
+      else if(a) html+=`<p class="ind-line">Measured ${MEASURED.filter(k=>ms[k]!=null).length} of ${MEASURED.length}.</p>`;
+      if(worse.length) html+=`<p class="warn">Measured ${worse.join(' and ')} came out 2 or more below prediction. Consider sending it back to Development.</p>`;
+    }
+  }
+
+  const isCurrent=isCur(d,i);
+  if(isCurrent) html+=`<p class="advice">In this stage for ${fmtDur(spentIn(d,s.id))}.</p>`;
+  else if(d.dates[s.id] && !(d.deployed&&!s.score)) html+=`<p class="advice">Completed ${fmtDate(d.dates[s.id])}${spentIn(d,s.id)?`, ${fmtDur(spentIn(d,s.id))} in this stage`:''}.</p>`;
+  if(d.deprecated){
+    html+=`${s.score?statusBlock(d,false):''}<div class="actions"><button class="btn ghost" data-act="restore">Restore to deployed</button><button class="btn ghost" data-act="delete">Delete permanently</button></div>`;
+  }else if(d.deployed && !isCurrent){
+    const canStart = d.stage===DEPLOY, due=reviewDue(d), toDate=(iso)=>iso?iso.slice(0,10):'';
+    if(canStart && i===DEPLOY){
+      html+=`<div class="review">
+        <div class="mf"><label for="cad">Review every</label><select id="cad" data-cad>${CADENCES.map(c=>`<option value="${c}" ${cadenceOf(d)===c?'selected':''}>${c} days${c===state.settings.cadence&&!d.cadence?' (default)':''}</option>`).join('')}</select></div>
+        <div class="actions"><button class="btn" data-act="logreview">Log a review</button></div>
+        <details class="gates"><summary>Edit dates</summary><div class="dates">
+          <label>Deployed on<input type="date" data-date="deployedAt" value="${toDate(d.deployedAt)}"></label>
+          <label>Last reviewed<input type="date" data-date="reviewedAt" value="${toDate(d.reviewedAt)}"></label>
+        </div></details>
+        <div class="actions"><button class="btn ghost" data-act="reopen">Reopen Deployment</button><button class="btn ghost" data-act="depr">Start deprecation</button></div>
+      </div>`;
+    }else if(canStart && i===DEPR){
+      html+=`<p class="advice">Optional. Start this when the rule should be retired. You can fill in the reason and checklist first; nothing changes until you complete it.</p>
+        <div class="actions"><button class="btn" data-act="depr">Start deprecation</button></div>`;
+    }else{
+      html+=`${s.score?statusBlock(d,false):''}${canStart?`<div class="actions"><button class="btn ghost" data-act="depr">Start deprecation</button></div>`:''}`;
+    }
+  }else if(!d.deployed && i===DEPR){
+    html+=`<p class="advice">Optional. Available once the detection is deployed.</p>`;
+  }else if(isCurrent){
+    const primary = i===DEPR ? 'Complete deprecation' : i===DEPLOY ? 'Mark as deployed' : `Complete ${s.short||s.name}`;
+    const extra = i===TEST ? `<button class="btn ghost" data-act="loop">Send back to Development</button>` : i===DEPR ? `<button class="btn ghost" data-act="cancelDepr">Cancel deprecation</button>` : '';
+    html+=`<div class="actions"><button class="btn" data-act="advance">${primary}</button>${extra}</div>`;
+  }else if(i<d.stage){
+    html+=`<p class="advice">Completed. Reopening moves the detection back to this stage.</p><div class="actions"><button class="btn ghost" data-act="rewind">Reopen ${s.short||s.name}</button></div>`;
+  }else{
+    html+=`<p class="advice">Not started. Finish ${STAGES[d.stage].name} first. You can still prepare this stage.</p>`;
+  }
+  if(d.loops) html+=`<p class="advice">Sent back to Development ${d.loops} time${d.loops>1?'s':''}.</p>`;
+  html+=`<p class="hint" role="status"></p>`;
+  $('panel').innerHTML=html; $('panelFull').innerHTML=html;
+}
+
+function pct(r){return r&&r.complete?r.total/r.max:-1}
+function parked(r){return r&&r.complete&&r.tier.t===4?1:0}
+function rank(r){return r&&r.complete?(5-r.tier.t)*10+r.total/r.max:-1}
+function sorted(){
+  return state.dets.map((d,i)=>({d,i,p:compute(d,'prio'),t:compute(d,'triage')}))
+    .sort((a,b)=>(nextAction(a.d).order-nextAction(b.d).order)||(rank(b.p)-rank(a.p))||(rank(b.t)-rank(a.t)));
+}
+function matches(d){
+  const q=$('fSearch').value.trim().toLowerCase(), tac=$('fTactic').value, own=$('fOwner').value, m=metaOf(d);
+  if(d.deprecated && !$('fDep').checked) return false;
+  if($('fMine').checked && state.settings.me && m.owner.trim().toLowerCase()!==state.settings.me.toLowerCase()) return false;
+  if(tac && !m.tactics.includes(tac)) return false;
+  if(own && m.owner.trim()!==own) return false;
+  if(q && ![label(d),m.techniques,m.dataSources,m.owner,d.rule].join(' ').toLowerCase().includes(q)) return false;
+  return true;
+}
+function renderMine(){
+  const has=!!state.settings.me, f=$('fMine');
+  f.disabled=!has; if(!has) f.checked=false; else f.checked=!!state.settings.onlyMine;
+  $('mineWrap').title=has?`Detections where the owner is ${state.settings.me}`:'Add your name at the top to use this';
+  $('mineWrap').style.opacity=has?'':'.5';
+}
+function renderFilters(){
+  renderMine();
+  const ft=$('fTactic'), fo=$('fOwner'), tv=ft.value, ov=fo.value;
+  ft.innerHTML='<option value="">All tactics</option>'+TACTICS.map(([id,n])=>`<option value="${id}">${n}</option>`).join('');
+  const owners=[...new Set(state.dets.map(d=>metaOf(d).owner.trim()).filter(Boolean))].sort();
+  fo.innerHTML='<option value="">All owners</option>'+owners.map(o=>`<option>${esc(o)}</option>`).join('');
+  ft.value=tv; fo.value=owners.includes(ov)?ov:'';
+}
+function hl(text){
+  const q=$('fSearch').value.trim(); text=String(text||'');
+  if(!q) return esc(text);
+  const low=text.toLowerCase(), ql=q.toLowerCase(); let out='', i=0, j;
+  while((j=low.indexOf(ql,i))>=0){ out+=esc(text.slice(i,j))+'<mark>'+esc(text.slice(j,j+q.length))+'</mark>'; i=j+q.length; }
+  return out+esc(text.slice(i));
+}
+function histText(h){
+  if(h.kind==='group') return `Scored ${h.group==='prio'?'prioritization':'triage'}: ${esc(h.parts.join(', '))}`;
+  if(h.kind==='event') return esc(h.label);
+  if(h.kind==='text') return `Edited ${esc(h.label)}`;
+  return `${esc(h.label)}: ${esc(fmtVal(h.from))} <span class="arrow">→</span> <b>${esc(fmtVal(h.to))}</b>`;
+}
+let historyAll=false;
+function renderHistory(){
+  const d=det(), raw=[...(d.history||[])].reverse(), h=[];
+  // first-time scoring creates one item per criterion; show those as a single line per dashboard
+  for(const x of raw){
+    const m=x.kind==='value'&&x.from==null&&/^s\.(prio|triage)\./.exec(x.key), prev=h[h.length-1];
+    if(m && prev && prev.group===m[1] && prev.by===x.by && Math.abs(new Date(prev.at)-new Date(x.at))<10*6e4){ prev.parts.unshift(`${x.label.replace(/ \(.*\)$/,'')} ${x.to}`); continue; }
+    if(m) h.push({...x,group:m[1],kind:'group',parts:[`${x.label.replace(/ \(.*\)$/,'')} ${x.to}`]});
+    else h.push(x);
+  }
+  const show=historyAll?h:h.slice(0,25);
+  $('historyCount').textContent=h.length||'';
+  $('historyList').innerHTML=h.length?show.map(x=>`<li><span class="h-when">${fmtDate(x.at)} ${new Date(x.at).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span><span class="h-who">${esc(x.by||'Someone')}</span><span>${histText(x)}</span></li>`).join('')
+    :'<li class="h-empty">No changes recorded yet. Changes are recorded from now on, with your name if you have added it.</li>';
+  $('historyMore').hidden=historyAll||h.length<=25;
+}
+function renderPipeline(){
+  renderFilters();
+  // tier first in plain words, score underneath; measured scores say so explicitly
+  const tierWords=(t)=>{const w=t.name.split(', ')[1]||''; return w.charAt(0).toUpperCase()+w.slice(1);};
+  const tierBox=(r,scoreLine)=>`<span class="tier-cell"><span class="pill" data-t="${r.tier.t}">${r.tier.name.split(',')[0]}</span> <span class="tw">${tierWords(r.tier)}</span></span>
+    <span class="sc">${scoreLine}${r.gated?`, <span title="${esc(r.gated.reasons.join('; '))}">capped by a gate</span>`:''}</span>`;
+  const cell=(r)=>r.complete?tierBox(r,`Score ${r.total}/${r.max}`):'<span class="sc">Not scored</span>';
+  const pcell=(d,r)=>{ if(!r.complete) return cell(r); const a=adjusted(d);
+    return (a&&a.complete&&a.total!==r.total)?tierBox(a,`Score ${a.total}/${a.max} after testing, predicted ${r.total}`):cell(r); };
+  const list=sorted().filter(x=>!isBlank(x.d)&&matches(x.d));
+  $('pipeBody').innerHTML=(list.length?'':`<tr class="empty-row"><td colspan="7">${state.dets.some(d=>!isBlank(d))?'No detections match these filters.':'No detections yet. Select New detection, or import a CSV from Share and export.'}</td></tr>`)+list.map(({d,i,p,t})=>{
+    return `<tr class="${i===state.cur?'active':''} ${d.deprecated?'dep':''}">
+      <td data-l="Detection">${hl(label(d))}${(()=>{const m=metaOf(d), ds=splitList(m.dataSources), tc=techs(d);
+        const rl=ruleHtml(d);
+        return ds.length||tc.length||rl?`<span class="dsline">${ds.length?`<span>Data: ${hl(ds.join(', '))}</span>`:''}${tc.length?`<span>${hl(tc.join(', '))}</span>`:''}${rl}</span>`:'';})()}<span class="who">${esc(changedLine(d))}</span></td><td data-l="Next action">${(a=>`<span class="na" data-t="${a.t}" title="${esc(a.why)}">${a.label}</span>`)(nextAction(d))}</td><td data-l="Stage">${stageLabel(d)} <span class="since">${d.deprecated&&d.deprecatedAt?fmtDate(d.deprecatedAt):d.stage===DEPR?fmtDur(spentIn(d,'depr')):d.deployed&&d.deployedAt?`in ${fmtDur(new Date(d.deployedAt)-new Date(d.created))}`:fmtDur(spentIn(d,STAGES[d.stage].id))}</span>${gapsOf(d).length?` <span class="pill" data-t="${hardGaps(d).length?4:3}">${gapSummary(d)}</span>`:''}${stageProgress(d)?`<span class="sc">${stageProgress(d)}</span>`:''}</td><td class="num" data-l="Detection value (prioritization)">${pcell(d,p)}</td><td class="num" data-l="Threat urgency (triage)">${cell(t)}</td><td data-l="Owner">${hl(metaOf(d).owner)||'–'}</td>
+      <td class="acts"><button class="linkbtn" data-open="${i}">Open</button><button class="linkbtn muted" data-del="${i}">Delete</button></td></tr>`;
+  }).join('');
+  renderGaps(); renderCoverage(); renderCalib(); renderTabs(); renderCycle(); renderNext(); save(); renderShare(); renderHistory();
+}
+function renderCycle(){
+  const dep=state.dets.filter(d=>d.deployed&&d.deployedAt);
+  const parts=[];
+  if(dep.length){ const m=median(dep.map(d=>new Date(d.deployedAt)-new Date(d.created))); parts.push(`${dep.length} deployed, median ${fmtDur(m)} from requirement to deployment.`); }
+  const per=STAGES.filter(st=>!st.optional).map(st=>({st,m:median(state.dets.filter(d=>d.dates[st.id]).map(d=>spentIn(d,st.id)))})).filter(x=>x.m!=null);
+  if(per.length>1){ const slow=per.reduce((a,b)=>b.m>a.m?b:a); if(slow.m>=DAY) parts.push(`Slowest stage: ${slow.st.name}, median ${fmtDur(slow.m)}.`); }
+  $('cycle').textContent=parts.join(' '); $('cycle').hidden=!parts.length;
+}
+function renderTabs(){
+  document.querySelectorAll('.tab').forEach(t=>{const on=t.dataset.tab===state.tab; t.setAttribute('aria-selected',on); t.tabIndex=on?0:-1;});
+  document.querySelectorAll('.tp').forEach(p=>p.hidden=p.id!=='p-'+state.tab);
+  const n=state.dets.filter(d=>!isBlank(d)).length, shown=$('pipeBody').querySelectorAll('tr:not(.empty-row)').length;
+  $('c-pipe').textContent = shown<n ? `${shown} of ${n}` : n;
+  const covered=TACTICS.filter(([id])=>state.dets.some(d=>!d.deprecated&&metaOf(d).tactics.includes(id))).length;
+  $('c-cov').textContent = covered ? `${covered}/14 tactics` : '';
+  const gaps=state.dets.reduce((a,d)=>a+(d.deprecated?0:gapsOf(d).length),0), cg=$('c-gaps');
+  cg.textContent = gaps||''; cg.classList.toggle('alert',gaps>0);
+  const tested=state.dets.filter(d=>(d.measured&&MEASURED.some(k=>d.measured[k]!=null))||!!lastMeasured(d)).length;
+  $('c-cal').textContent = tested||'';
+}
+
+function renderCoverageSummary(){
+  const live=state.dets.filter(d=>!d.deprecated);
+  const tac=TACTICS.filter(([id])=>live.some(d=>metaOf(d).tactics.includes(id))).length;
+  const all=new Set(live.flatMap(techs).filter(t=>TECH_RE.test(t)));
+  const dep=new Set(live.filter(d=>d.deployed).flatMap(techs).filter(t=>TECH_RE.test(t)));
+  $('covSummary').textContent = tac
+    ? `${tac} of 14 tactics ${tac===1?'has':'have'} at least one detection. ${all.size} technique${all.size===1?'':'s'} covered, ${dep.size} of them by a deployed rule. A tactic counts as covered with a single detection, so the technique count is the better measure.`
+    : '';
+}
+function renderCoverage(){
+  renderCoverageSummary();
+  const sel=$('fTactic').value;
+  $('cov').innerHTML=TACTICS.map(([id,n])=>{
+    const ds=state.dets.filter(d=>!d.deprecated&&metaOf(d).tactics.includes(id));
+    const live=ds.filter(d=>d.deployed).length, cls=!ds.length?'none':live?'live':'prog';
+    const tids=[...new Set(ds.flatMap(techs).filter(t=>TECH_RE.test(t)))].sort();
+    return `<button class="tc ${cls}" data-cov="${id}" aria-pressed="${sel===id}" ${sel===id?'style="outline:3px solid var(--focus);outline-offset:1px"':''}>
+      <b>${n}</b><span class="cnt">${ds.length?`${live} deployed, ${ds.length-live} in progress`:'None'}</span>
+      ${tids.length?`<span class="tids">${tids.join(', ')}</span>`:''}</button>`;
+  }).join('');
+}
+function renderCalib(){
+  const rows=MEASURED.map(id=>{
+    const c=SCORING.prio.criteria.find(x=>x.id===id);
+    const pairs=state.dets.filter(d=>d.measured&&d.measured[id]!=null&&d.scores.prio[id]!=null).map(d=>d.measured[id]-d.scores.prio[id]);
+    if(!pairs.length) return '';
+    const avg=pairs.reduce((a,b)=>a+b,0)/pairs.length, r=Math.round(avg*10)/10;
+    const absAvg=Math.round(pairs.reduce((x,y)=>x+Math.abs(y),0)/pairs.length*10)/10;
+    const verdict=Math.abs(avg)<0.25?(absAvg>=0.75?`No consistent bias, but predictions miss by ${absAvg} on average in both directions`:'Predictions are on target'):avg<0?`Predicted ${Math.abs(r)} too high on average, so score this more cautiously`:`Predicted ${r} too low on average, so you can be less cautious`;
+    return `<div class="cal-row"><h3>${c.name}</h3><p>${verdict}. <span class="arrow">Based on ${pairs.length} tested detection${pairs.length>1?'s':''}.</span></p></div>`;
+  }).join('');
+  // production: false positives per week at the latest review with numbers, placed on the noisiness scale
+  const prodPairs=state.dets.filter(d=>lastMeasured(d)&&d.scores.prio.noise!=null).map(d=>noiseBand(fpPerWeek(d,lastMeasured(d))).v-d.scores.prio.noise);
+  let prodRow='';
+  if(prodPairs.length){
+    const avg=prodPairs.reduce((a,b)=>a+b,0)/prodPairs.length, r=Math.round(Math.abs(avg)*10)/10;
+    const v=Math.abs(avg)<0.25?'Production matches what was predicted':avg<0?`Rules are ${r} noisier in production than predicted, on average`:`Rules are ${r} quieter in production than predicted, on average`;
+    prodRow=`<div class="cal-row"><h3>Noisiness in production</h3><p>${v}. <span class="arrow">From the latest review with alert numbers for ${prodPairs.length} deployed rule${prodPairs.length>1?'s':''}, using false positives per week: under 1 is silent precision, 1 to 5 low noise, 5 to 20 noisy, over 20 very noisy.</span></p></div>`;
+  }
+  const tested=state.dets.map((d,i)=>({d,i})).filter(({d})=>(d.measured&&MEASURED.some(k=>d.measured[k]!=null))||!!lastMeasured(d));
+  $('calWrap').hidden=!tested.length;
+  $('calEmpty').innerHTML=tested.length?'':'<div class="gaps-body"><p class="gap-empty" style="padding:18px 0">No measured scores yet. Re-score coverage, confidence, noise and attacker cost in Testing to see how predictions hold up.</p></div>';
+  $('calib').innerHTML=rows+prodRow;
+  const miss=(d)=>MEASURED.reduce((a,k)=>a+(((d.measured||{})[k]!=null&&d.scores.prio[k]!=null)?Math.abs(d.measured[k]-d.scores.prio[k]):0),0);
+  const dcell=(pv,mv)=>{
+    if(mv==null) return '<td class="dc na">–</td>';
+    if(pv==null) return `<td class="dc na">? → ${mv}</td>`;
+    const dd=mv-pv, cls=dd===0?'eq':dd>0?'up':'down';
+    return `<td class="dc ${cls}" title="${dd===0?'As predicted':dd>0?dd+' better than predicted':(-dd)+' worse than predicted'}">${pv} → ${mv}${dd?` (${dd>0?'+':''}${dd})`:''}</td>`;
+  };
+  $('calRules').innerHTML=tested.sort((a,b)=>miss(b.d)-miss(a.d)).map(({d,i})=>{
+    const r=compute(d,'prio'), a=adjusted(d);
+    const pr=(r.complete&&a&&a.complete)?`<span class="pill" data-t="${a.tier.t}">${a.tier.name.split(',')[0]}</span> ${a.total}/${a.max} <span class="arrow">after testing, predicted ${r.total}</span>`:'–';
+    const lr=lastMeasured(d), pv=precision(lr);
+    const fw=lr?fpPerWeek(d,lr):null, band=fw!=null?noiseBand(fw):null;
+    const prod=band?`<span class="${band.v<=1?'rv-bad':band.v===2?'rv-mid':'rv-good'}">${fmtRate(fw)} false/week</span> <span class="arrow">${band.l.toLowerCase()}, ${Math.round(pv*100)}% real</span>`:'–';
+    return `<tr><td><button class="linkbtn" data-opentest="${i}">${esc(label(d))}</button></td>${MEASURED.map(k=>dcell(d.scores.prio[k],(d.measured||{})[k])).join('')}<td class="num">${pr}</td><td class="num">${prod}</td></tr>`;
+  }).join('');
+}
+
+function gapGroups(){
+  const map={};
+  state.dets.forEach((d,i)=>!d.deprecated&&gapsOf(d).forEach(g=>{(map[g.label]=map[g.label]||[]).push({d,i,kind:g.kind,note:g.note,tier:compute(d,'prio').tier})}));
+  const best=(arr)=>Math.min(...arr.map(x=>x.tier?x.tier.t:9));
+  const hard=(arr)=>arr[0].kind==='gap'?0:1;   // missing data ranks above partly missing data
+  return Object.entries(map).sort((a,b)=>(hard(a[1])-hard(b[1]))||(b[1].length-a[1].length)||(best(a[1])-best(b[1])));
+}
+function renderGaps(){
+  const groups=gapGroups();
+  $('gapsBody').innerHTML = groups.length ? groups.map(([lab,arr])=>`<div class="gap-row">
+      <div><h3>${esc(lab)}</h3><p class="n ${arr[0].kind}">${arr[0].kind==='partial'?'Limits':'Blocks'} ${arr.length} detection${arr.length>1?'s':''}</p></div>
+      <ul class="gap-list">${arr.sort((a,b)=>(a.tier?a.tier.t:9)-(b.tier?b.tier.t:9)).map(x=>`<li>
+        ${x.tier?`<span class="pill" data-t="${x.tier.t}">${x.tier.name.split(',')[0]}</span>`:''}
+        <button class="linkbtn" data-open="${x.i}">${esc(label(x.d))}</button>
+        ${x.note?`<span class="gn">${esc(x.note)}</span>`:''}</li>`).join('')}</ul></div>`).join('')
+    : `<p class="gap-empty" style="padding:18px 0">No gaps recorded. In Investigation, mark a log source check as Partial or Gap and it shows up here.</p>`;
+}
+
+/* Persistence: autosave to this browser when storage is available */
+const KEY='de-lifecycle';
+let storeOK=false;
+try{ localStorage.setItem(KEY+'-t','1'); localStorage.removeItem(KEY+'-t'); storeOK=true; }catch(e){}
+const snap=new Map();
+function sig(d){ const {updatedAt,updatedBy,baseAt,id,history,...rest}=d; return JSON.stringify(rest); }
+const fmtVal=(v)=>v==null||v===''||(Array.isArray(v)&&!v.length)?'–':Array.isArray(v)?v.join(', '):String(v);
+const critName=(mode,id)=>(SCORING[mode].criteria.find(c=>c.id===id)||{name:id}).name;
+const lsWord=(v)=>v===true?'OK':v==='gap'?'Gap':v==='partial'?'Partial':'–';
+// Turn the difference between two versions of a detection into readable history items
+function describeChanges(a,b){
+  const out=[], V=(key,label,from,to)=>out.push({key,label,from,to,kind:'value'}),
+        T=(key,label)=>out.push({key,label,kind:'text'}), E=(key,label)=>out.push({key,label,kind:'event'});
+  if(!a){ E('created','Created'); return out; }
+  if(a.name!==b.name) V('name','Name',a.name,b.name);
+  if(a.deprecated!==b.deprecated) E('status',b.deprecated?'Deprecated':'Restored to deployed');
+  else if(a.deployed!==b.deployed) E('status',b.deployed?'Marked as deployed':'Reopened Deployment');
+  else if((b.loops||0)>(a.loops||0)) E('stage','Sent back to Development');
+  else if(a.stage!==b.stage) E('stage',b.stage===DEPR?'Started deprecation':a.stage===DEPR&&b.stage===DEPLOY?'Cancelled deprecation':`Moved to ${STAGES[b.stage].name}`);
+  for(const mode of ['prio','triage']) for(const c of SCORING[mode].criteria){
+    const x=(a.scores[mode]||{})[c.id], y=(b.scores[mode]||{})[c.id];
+    if(x!==y) V(`s.${mode}.${c.id}`,`${c.name} (${mode==='prio'?'prioritization':'triage'})`,x,y);
+  }
+  for(const k of MEASURED){ const x=(a.measured||{})[k], y=(b.measured||{})[k]; if(x!==y) V(`m.${k}`,`Measured ${critName('prio',k).toLowerCase()}`,x,y); }
+  const lsGroup=STAGES[IDX.invest].groups.find(g=>g.gap), nLs=lsGroup.items.length;
+  for(const st of STAGES.filter(x=>x.items)){
+    const x=(a.checks||{})[st.id]||[], y=(b.checks||{})[st.id]||[];
+    if(st.id==='invest') for(let k=0;k<nLs;k++){ if((x[k]??false)!==(y[k]??false)) V(`ls.${k}`,`Log source: ${lsGroup.gapLabels[k].replace(/^No /,'').replace(/^./,c=>c.toUpperCase())}`,lsWord(x[k]),lsWord(y[k])); }
+    const from=st.id==='invest'?nLs:0, cnt=(arr)=>st.items.filter((_,k)=>k>=from&&arr[k]===true).length;
+    if(cnt(x)!==cnt(y)) V(`c.${st.id}`,`${st.name} checklist ticked`,cnt(x),cnt(y));
+  }
+  if(JSON.stringify(a.gapNotes||{})!==JSON.stringify(b.gapNotes||{})) T('gapnotes','log source notes');
+  for(const st of STAGES) if(((a.notes||{})[st.id]||'')!==((b.notes||{})[st.id]||'')) T(`n.${st.id}`,`${st.name} notes`);
+  const ma=a.meta||{}, mb=b.meta||{};
+  [['owner','Owner'],['source','Trigger'],['techniques','Techniques'],['dataSources','Data sources']].forEach(([k,l])=>{ if((ma[k]||'')!==(mb[k]||'')) V(`meta.${k}`,l,ma[k],mb[k]); });
+  const tn=(arr)=>(arr||[]).map(id=>(TACTICS.find(t=>t[0]===id)||[0,id])[1]);
+  if(JSON.stringify(ma.tactics||[])!==JSON.stringify(mb.tactics||[])) V('meta.tactics','Tactics',tn(ma.tactics),tn(mb.tactics));
+  if(a.indicator!==b.indicator) V('indicator','Indicator type',(INDICATORS.find(x=>x.id===a.indicator)||{}).name,(INDICATORS.find(x=>x.id===b.indicator)||{}).name);
+  if((a.rule||'')!==(b.rule||'')) V('rule','Rule link',a.rule,b.rule);
+  if(a.cadence!==b.cadence) V('cadence','Review every (days)',a.cadence||state.settings.cadence,b.cadence||state.settings.cadence);
+  if((a.depr||{}).reason!==(b.depr||{}).reason) V('depr.reason','Deprecation reason',(a.depr||{}).reason,(b.depr||{}).reason);
+  if((a.depr||{}).replacement!==(b.depr||{}).replacement) E('depr.rep','Replacement detection changed');
+  const ra=(a.reviews||[]).length, rb=(b.reviews||[]).length;
+  if(rb>ra) (b.reviews||[]).slice(ra).forEach(r=>E('review',`Review logged for ${fmtDate(r.at)}${r.alerts!=null?`: ${r.alerts} alerts`:''}${r.tp!=null?`, ${r.tp} real`:''}${r.test?`, test ${r.test}`:''}`));
+  if(a.created!==b.created) V('created','Requested on',(a.created||'').slice(0,10),(b.created||'').slice(0,10));
+  if(a.deployedAt!==b.deployedAt && a.deployed===b.deployed) V('deployedAt','Deployed on',(a.deployedAt||'').slice(0,10),(b.deployedAt||'').slice(0,10));
+  return out;
+}
+function addHistory(d,items,now,me){
+  d.history=d.history||[];
+  for(const e of items){
+    // typing produces many small changes: fold them into one item per field, per person, within 10 minutes
+    let k=d.history.length-1; while(k>=0&&d.history[k].key!==e.key) k--;
+    const h=k>=0?d.history[k]:null;
+    if(h && e.kind!=='event' && h.by===me && new Date(now)-new Date(h.at)<10*6e4){
+      h.to=e.to; h.at=now; h.label=e.label;
+      if(e.kind==='value' && fmtVal(h.from)===fmtVal(h.to)) d.history.splice(k,1);   // changed back again
+    } else d.history.push({at:now,by:me,...e});
+  }
+  if(d.history.length>150) d.history=d.history.slice(-150);
+}
+function resetSnap(){ snap.clear(); state.dets.forEach(d=>snap.set(d.uid,sig(d))); }
+function stamp(){
+  const now=new Date().toISOString(), me=state.settings.me||'';
+  state.dets.forEach(d=>{
+    const g=sig(d), prev=snap.get(d.uid);
+    if(prev!==g){
+      if(!isBlank(d)) addHistory(d,describeChanges(prev?JSON.parse(prev):null,JSON.parse(g)),now,me);
+      d.updatedAt=now; d.updatedBy=me; snap.set(d.uid,g);
+    }
+  });
+}
+function fmtAgo(iso){
+  if(!iso) return '';
+  const m=Math.round((Date.now()-new Date(iso))/6e4);
+  if(m<1) return 'just now'; if(m<60) return `${m} min ago`;
+  const h=Math.round(m/60); if(h<24) return `${h} hour${h>1?'s':''} ago`;
+  return fmtDate(iso);
+}
+const changedLine=(d)=>d.updatedAt?`Changed ${fmtAgo(d.updatedAt)}${d.updatedBy?` by ${d.updatedBy}`:''}`:'';
+function saveNow(){
+  if(!storeOK) return;
+  clearTimeout(save.t); save.t=null;
+  try{ localStorage.setItem(KEY,JSON.stringify({version:6,tombs:state.tombs,dets:state.dets,cur:state.cur,view:state.view,tab:state.tab,screen:state.screen,settings:state.settings})); }
+  catch(e){ setStatus('Could not save: browser storage is full. Use Share and export, then Save shared file.',true); }
+}
+function save(){
+  stamp();
+  if(!storeOK) return;
+  clearTimeout(save.t); save.t=setTimeout(saveNow,300);
+}
+// Flush pending changes when the tab is hidden, closed or reloaded
+window.addEventListener('pagehide',()=>{ if(save.t) saveNow(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && save.t) saveNow(); });
+function setStatus(msg,bad){ const el=$('saveStatus'); el.textContent=msg; el.classList.toggle('bad',!!bad); }
+function hydrate(list){ const out=list.map(d=>{const n={...newDetection(),...d}; if(!d.uid) n.uid=newUid(); n.updatedAt=n.updatedAt||n.created||new Date().toISOString(); n.updatedBy=n.updatedBy||''; n.baseAt=n.baseAt||''; if(!n.id||list.filter(x=>x.id===n.id).length>1) n.id=++uid; uid=Math.max(uid,n.id); n.gapNotes=n.gapNotes||{}; n.measured=n.measured||{}; n.meta={source:'',owner:'',techniques:'',dataSources:'',tactics:[],...(n.meta||{})}; n.stage=Math.min(n.stage||0,LAST); n.created=n.created||new Date().toISOString(); n.enteredAt=n.enteredAt||Date.now(); n.spent=n.spent||{}; n.dates=n.dates||{}; n.depr={reason:'',replacement:'',...(n.depr||{})}; n.reviews=(n.reviews||[]).map(r=>typeof r==='string'?{at:r}:r); n.rule=n.rule||''; if(n.deployed&&!n.reviewedAt) n.reviewedAt=n.deployedAt; return n;});
+  out.forEach(n=>{ const r=n.depr.replacement; if(r && !out.some(x=>x.uid===String(r))){ const m=out.find(x=>String(x.id)===String(r)); n.depr.replacement=m?m.uid:''; } });
+  return out; }
+function load(){
+  if(!storeOK){ setStatus('This browser is blocking storage here, so work is lost when the tab closes. Use Share and export, then Save shared file.',true); return; }
+  try{
+    const data=JSON.parse(localStorage.getItem(KEY)||'null');
+    if(data&&Array.isArray(data.detections||data.dets)&&(data.dets||data.detections).length){
+      state.dets=hydrate(data.dets||data.detections); state.tombs=Array.isArray(data.tombs)?data.tombs:[];
+      state.cur=Math.min(data.cur||0,state.dets.length-1);
+      state.view=Math.min(data.view??det().stage,LAST);
+      if(['pipe','cov','gaps','cal'].includes(data.tab)) state.tab=data.tab;
+      if((data.screen==='detail'||data.screen==='summary')&&!isBlank(det())) state.screen=data.screen;
+      if(data.settings) state.settings={...state.settings,...data.settings};
+      $('fDep').checked=state.settings.showDep!==false;
+    }
+  }catch(e){}
+  $('meName').value=state.settings.me||'';
+  resetSnap();
+  setStatus('Saved automatically in this browser.');
+}
+
+function render(){renderPicker();renderRail();renderStage();renderPanel();renderPipeline();applyScreen()}
+function fitTitle(){ const t=$('detName'); t.style.height='auto'; t.style.height=t.scrollHeight+'px'; }
+// One page per detection, as HTML for screen and print, and as Markdown for pasting into tickets or meeting notes
+function buildSummary(d){
+  const m=metaOf(d), a=nextAction(d), p=compute(d,'prio'), adj=adjusted(d), t=compute(d,'triage'), H=[], M=[];
+  const sec=(title)=>{ H.push(`<h2>${esc(title)}</h2>`); M.push(`\n## ${title}`); };
+  const row=(k,v)=>{ if(v==null||v==='') return; H.push(`<div class="kv"><span>${esc(k)}</span><span>${v.html??esc(v)}</span></div>`); M.push(`- **${k}:** ${v.md??v}`); };
+  const para=(txt)=>{ H.push(`<p>${esc(txt)}</p>`); M.push(txt); };
+  H.push(`<h1>${esc(label(d))}</h1>`); M.push(`# ${label(d)}`);
+  const u=safeUrl(d.rule);
+  row('Stage',stageLabel(d)); row('Next action',`${a.label}. ${a.why}`); row('Owner',m.owner); row('Trigger',m.source);
+  row('Requested on',fmtDate(d.created)); if(d.rule) row('Rule',u?{html:`<a href="${esc(u)}">${esc(u)}</a>`,md:u}:d.rule);
+  if(m.tactics.length||techs(d).length||splitList(m.dataSources).length||indOf(d)) sec('Scope');
+  row('Tactics',m.tactics.map(id=>(TACTICS.find(x=>x[0]===id)||[0,id])[1]).join(', ')); row('Techniques',techs(d).join(', '));
+  row('Data sources',splitList(m.dataSources).join(', ')); row('Indicator type',indOf(d)?`${indOf(d).name} (${indOf(d).pain.toLowerCase()})`:'');
+  const scoreBlock=(title,mode,r,measured)=>{
+    sec(title);
+    if(!r.complete){ para('Not fully scored yet.'); return; }
+    const fin=measured&&measured.complete?measured:r;
+    row('Tier',`${fin.tier.name}${fin.gated?` (capped by a gate: ${fin.gated.reasons.join('; ').toLowerCase()})`:''}`);
+    row('Score',measured&&measured.complete&&measured.total!==r.total?`${measured.total}/${measured.max} after testing, predicted ${r.total}/${r.max}`:`${r.total}/${r.max}`);
+    SCORING[mode].criteria.forEach(c=>{ const v=r.s[c.id], mv=mode==='prio'?(d.measured||{})[c.id]:null;
+      if(v!=null) row(c.name,`${v}, ${c.opts.find(o=>o.v===v)?.l||''}${mv!=null&&mv!==v?`. Measured ${mv}, ${c.opts[mv-1].l}`:''}`); });
+  };
+  scoreBlock('Detection value (prioritization)','prio',p,adj);
+  scoreBlock('Threat urgency (triage)','triage',t,null);
+  const gaps=gapsOf(d);
+  if(gaps.length){ sec('Data gaps'); gaps.forEach(g=>row(g.kind==='gap'?'Gap':'Partial',`${g.label}${g.note?`: ${g.note}`:''}`)); }
+  if(d.deployed){
+    sec('In production');
+    row('Deployed on',d.deployedAt?fmtDate(d.deployedAt):''); row('Review every',`${cadenceOf(d)} days`);
+    const due=reviewDue(d); if(due) row('Next review',`${fmtDate(due.toISOString())} (${dueText(due)})`);
+    const rv=[...d.reviews].sort((x,y)=>x.at<y.at?1:-1).slice(0,5);
+    rv.forEach(r=>{ const fw=fpPerWeek(d,r); row(`Review ${fmtDate(r.at)}`,[r.alerts!=null&&`${r.alerts} alerts`, r.tp!=null&&`${r.tp} real`, fw!=null&&`${fmtRate(fw)} false per week`, r.test&&`test ${r.test}`, r.by&&`by ${r.by}`, r.note].filter(Boolean).join(', ')||'Logged'); });
+  }
+  if(d.deprecated){ sec('Deprecation'); const rp=state.dets.find(x=>x.uid===d.depr.replacement);
+    row('Deprecated on',d.deprecatedAt?fmtDate(d.deprecatedAt):''); row('Reason',d.depr.reason); row('Replaced by',rp?label(rp):'Nothing, gap accepted'); }
+  const notes=STAGES.filter(st=>(d.notes[st.id]||'').trim());
+  if(notes.length){ sec('Notes'); notes.forEach(st=>row(st.name,d.notes[st.id].trim())); }
+  const foot=`Summary made ${fmtDate(new Date().toISOString())}${state.settings.me?` by ${state.settings.me}`:''}. ${changedLine(d)}.`;
+  H.push(`<p class="sum-foot">${esc(foot)}</p>`); M.push(`\n_${foot}_`);
+  return {html:H.join(''),md:M.join('\n')};
+}
+function applyScreen(){
+  $('viewOverview').hidden=state.screen!=='overview';
+  $('viewDetail').hidden=state.screen!=='detail';
+  $('viewSummary').hidden=state.screen!=='summary';
+  if(state.screen==='summary') $('summaryBody').innerHTML=buildSummary(det()).html;
+  if(state.screen==='detail') fitTitle();
+}
+function show(screen){
+  if(screen==='overview') purgeBlanks();
+  state.screen=screen; render(); window.scrollTo(0,0); save();
+}
+function openDetection(i,stage){
+  historyAll=false;
+  state.cur=i; state.view=stage!=null?stage:Math.min(det().stage,LAST); show('detail');
+  $('detName').value=det().name;   // always show the opened detection's name, even if the field had focus
+}
+// untouched new detections are dropped when you leave them, so the pipeline never fills with "Untitled"
+function purgeBlanks(){
+  const keep=state.dets.filter(d=>!isBlank(d));
+  if(keep.length!==state.dets.length){ state.dets=keep.length?keep:[newDetection()]; state.cur=Math.min(state.cur,state.dets.length-1); }
+}
+function renderNext(){
+  const a=nextAction(det());
+  $('nextAction').innerHTML=`<span>Next action</span><span class="na" data-t="${a.t}">${a.label}</span><span class="why">${esc(a.why)}</span>${ruleHtml(det())}${det().updatedAt?`<span class="changed">${esc(changedLine(det()))}.</span>`:''}`;
+}
+function ask(anchor,msg,yesLabel,onYes,danger){
+  document.querySelectorAll('.inline-confirm, tr.confirm-row').forEach(x=>x.remove());
+  const box=document.createElement('div'); box.className='inline-confirm'; box.setAttribute('role','alertdialog');
+  box.innerHTML='<p></p><div class="actions"><button type="button" class="btn" data-yes></button><button type="button" class="btn ghost" data-no>Cancel</button></div>';
+  box.querySelector('p').textContent=msg;
+  const yes=box.querySelector('[data-yes]'); yes.textContent=yesLabel; if(danger) yes.classList.add('danger');
+  const row=anchor.closest('tr');
+  let wrap=box;
+  if(row){ wrap=document.createElement('tr'); wrap.className='confirm-row'; const td=document.createElement('td'); td.colSpan=7; td.appendChild(box); wrap.appendChild(td); row.after(wrap); }
+  else (anchor.closest('.actions')||anchor).after(box);
+  yes.addEventListener('click',e=>{ e.stopPropagation(); wrap.remove(); onYes(); });
+  box.querySelector('[data-no]').addEventListener('click',e=>{ e.stopPropagation(); wrap.remove(); anchor.focus({preventScroll:true}); });
+  box.addEventListener('keydown',e=>{ if(e.key==='Escape'){ wrap.remove(); anchor.focus({preventScroll:true}); } });
+  yes.focus({preventScroll:true}); box.scrollIntoView({block:'nearest'});
+}
+function deleteDetection(i,anchor){
+  ask(anchor,`Delete "${label(state.dets[i])}" permanently? This cannot be undone.`,'Delete',()=>{
+    const gone=state.dets[i];
+    state.tombs=state.tombs.filter(t=>t.uid!==gone.uid);
+    state.tombs.push({uid:gone.uid,name:label(gone),updatedAt:new Date().toISOString(),updatedBy:state.settings.me||''});
+    state.dets.splice(i,1); snap.delete(gone.uid);
+    state.dets.forEach(x=>{ if(x.depr.replacement===gone.uid) x.depr.replacement=''; });
+    if(!state.dets.length) state.dets.push(newDetection());
+    state.cur=Math.min(state.cur,state.dets.length-1); state.view=det().stage; render();
+    if(state.screen==='detail') show('overview');
+    flash('Detection deleted.');
+  },true);
+}
+function flash(msg,ms=3500){const hs=document.querySelectorAll('.hint'); hs.forEach(h=>h.textContent=msg); clearTimeout(flash.t); flash.t=setTimeout(()=>document.querySelectorAll('.hint').forEach(h=>h.textContent=''),ms)}
+
+$('detSel').addEventListener('change',e=>{ openDetection(+e.target.value); });
+$('detName').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); } });
+$('detName').addEventListener('input',e=>{ fitTitle(); });
+$('detName').addEventListener('input',e=>{det().name=e.target.value; renderPicker(); renderPipeline()});
+$('newDet').addEventListener('click',()=>{
+  purgeBlanks();
+  const blank=state.dets.findIndex(isBlank);
+  if(blank>=0) openDetection(blank,0); else { state.dets.push(newDetection()); openDetection(state.dets.length-1,0); }
+  $('detName').focus();
+});
+$('backBtn').addEventListener('click',()=>show('overview'));
+$('summaryBtn').addEventListener('click',()=>show('summary'));
+$('sumBack').addEventListener('click',()=>show('detail'));
+$('sumCopy').addEventListener('click',async()=>{
+  try{ await navigator.clipboard.writeText(buildSummary(det()).md); flash('Summary copied as Markdown.'); }
+  catch{ flash('The browser blocked copying. Select the text on the page and copy it instead.',6000); }
+});
+$('sumPrint').addEventListener('click',()=>{
+  try{ window.print(); }catch{ flash('Printing is blocked here. Open the file in a browser to print or save as PDF.',6000); }
+});
+$('historyMore').addEventListener('click',()=>{ historyAll=true; renderHistory(); });
+$('goHome').addEventListener('click',()=>show('overview'));
+
+$('rail').addEventListener('click',e=>{const b=e.target.closest('.stop'); if(!b) return; state.view=+b.dataset.i; renderRail(); renderStage(); renderPanel(); save()});
+$('rail').addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight'].includes(e.key)) return;
+  state.view=Math.max(0,Math.min(LAST,state.view+(e.key==='ArrowRight'?1:-1)));
+  renderRail(); renderStage(); renderPanel(); $('rail').querySelector(`[data-i="${state.view}"]`).focus();
+});
+
+$('stageBody').addEventListener('click',e=>{
+  if(e.target.closest('[data-rv-save]')){
+    const d=det(), num=(id)=>{const v=$(id).value.trim(); return v===''?null:Math.max(0,Math.round(+v));};
+    const alerts=num('rv-alerts'), tp=num('rv-tp'), at=$('rv-at').value;
+    if(!at){ flash('Choose a review date.'); return; }
+    if(tp!=null && alerts==null){ flash('Add the number of alerts too, so precision can be worked out.'); $('rv-alerts').focus(); return; }
+    if(tp!=null && tp>alerts){ flash('True positives cannot be more than the number of alerts.'); $('rv-tp').focus(); return; }
+    const iso=new Date(at+'T12:00:00').toISOString();
+    d.reviews.push({at:iso,alerts,tp,test:$('rv-test').value,note:$('rv-note').value.trim(),by:state.settings.me||''});
+    if(!d.reviewedAt||iso>d.reviewedAt) d.reviewedAt=iso;
+    render(); flash('Review saved.'); return;
+  }
+  const tb=e.target.closest('[data-tac]');
+  if(tb){ const m=metaOf(det()), id=tb.dataset.tac; m.tactics=m.tactics.includes(id)?m.tactics.filter(x=>x!==id):[...m.tactics,id];
+    tb.setAttribute('aria-pressed',m.tactics.includes(id)); renderPanel(); renderPipeline(); return; }
+  const mb=e.target.closest('[data-mc]');
+  if(mb){ const d=det(), id=mb.dataset.mc, v=+mb.dataset.v; d.measured=d.measured||{}; d.measured[id]=d.measured[id]===v?null:v;
+    renderStage(); renderPanel(); renderPipeline(); return; }
+  const ls=e.target.closest('[data-ls]');
+  if(ls){
+    const d=det(), k=+ls.dataset.ls, v=ls.dataset.v==='ok'?true:ls.dataset.v, arr=(d.checks.invest=d.checks.invest||[]);
+    arr[k] = arr[k]===v ? false : v;
+    renderStage(); renderPanel(); renderPipeline();
+    if(arr[k]==='gap'||arr[k]==='partial'){ const inp=$('stageBody').querySelector(`[data-gn="${k}"]`); if(inp) inp.focus(); }
+    return;
+  }
+  const ib=e.target.closest('.ind');
+  if(ib){ const d=det(); d.indicator = d.indicator===ib.dataset.ind ? null : ib.dataset.ind; renderStage(); renderPanel(); renderPipeline(); return; }
+  const b=e.target.closest('.opt'); if(!b||b.disabled) return;
+  const s=det().scores[STAGES[state.view].score], id=b.dataset.c, v=+b.dataset.v;
+  if(s[id]===v) delete s[id]; else s[id]=v;
+  renderStage(); renderPanel(); renderPipeline();
+});
+$('stageBody').addEventListener('change',e=>{
+  if(e.target.dataset.dp){ det().depr[e.target.dataset.dp]=e.target.value; renderPanel(); renderPipeline(); return; }
+  if(e.target.dataset.m){ metaOf(det())[e.target.dataset.m]=e.target.value;
+    if(e.target.dataset.m==='source') $('srcHelp').textContent=SOURCE_HELP[e.target.value]||'Why we need this detection in the first place';
+    renderPanel(); renderPipeline(); return; }
+  if(e.target.dataset.date){ setDate(det(),e.target.dataset.date,e.target.value); renderRail(); renderPanel(); renderPipeline(); return; }
+  if(!e.target.matches('input[type=checkbox]')) return;
+  const sid=STAGES[state.view].id, d=det();
+  (d.checks[sid]=d.checks[sid]||[])[+e.target.dataset.k]=e.target.checked;
+  renderPanel(); renderPipeline();
+});
+$('stageBody').addEventListener('input',e=>{
+  if(e.target.matches('[data-rule]')){ det().rule=e.target.value; renderNext(); renderPipeline(); return; }
+  if(e.target.dataset.m){
+    const m=metaOf(det()); m[e.target.dataset.m]=e.target.value;
+    if(e.target.dataset.m==='techniques'){ const bad=techs(det()).filter(t=>!TECH_RE.test(t)), h=$('techHint');
+      h.className=bad.length?'bad':''; h.textContent=bad.length?`Not a technique ID: ${bad.join(', ')}`:'Comma separated, e.g. T1003 or T1003.001'; }
+    renderPanel(); renderPipeline(); renderPicker(); return;
+  }
+  if(e.target.id==='notes'){ det().notes[STAGES[state.view].id]=e.target.value; save(); }
+  if(e.target.dataset.gn!=null){ const d=det(); (d.gapNotes=d.gapNotes||{})[e.target.dataset.gn]=e.target.value; renderGaps(); save(); }
+});
+
+['panel','panelFull'].forEach(pid=>$(pid).addEventListener('change',e=>{
+  if(e.target.matches('[data-gates]')){ state.settings.gates=e.target.checked; renderPanel(); renderPipeline(); }
+  if(e.target.matches('[data-cad]')){ const d=det(), v=+e.target.value; d.cadence = v===state.settings.cadence?null:v; renderPanel(); renderPipeline(); }
+  if(e.target.dataset.date){ setDate(det(),e.target.dataset.date,e.target.value); renderPanel(); renderPipeline(); }
+}));
+['panel','panelFull'].forEach(pid=>$(pid).addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(b) runAct(b.dataset.act,false,b);
+}));
+function runAct(act,force,anchor){
+  const d=det(), s=STAGES[state.view];
+  if(act==='delete'){ deleteDetection(state.cur,anchor); return; }
+  if(act==='advance'){
+    if(s.score && !compute(d,s.score).complete){ flash('Rate every criterion before completing this stage.'); return; }
+    if(s.items && !force){ const p=checkProgress(d,s); if(p.done<p.total){
+      ask(anchor,`${p.total-p.done} checklist item${p.total-p.done>1?'s are':' is'} still open. Complete ${s.name} anyway?`,`Complete ${s.short||s.name}`,()=>runAct('advance',true)); return; } }
+    leave(d); d.dates[s.id]=new Date().toISOString();
+    if(state.view===DEPR){ d.deprecated=true; d.deprecatedAt=d.dates[s.id]; }
+    else if(state.view===DEPLOY){ d.deployed=true; d.deployedAt=d.dates[s.id]; d.reviewedAt=d.deployedAt; }
+    else { d.stage++; state.view=d.stage; }
+  }else if(act==='loop'){
+    leave(d); d.loops++; d.stage=DEV; state.view=DEV;
+    ['dev','test'].forEach(id=>{ d.checks[id]=[]; delete d.dates[id]; });
+  }else if(act==='rewind'){
+    leave(d); d.stage=state.view; STAGES.slice(state.view).forEach(x=>delete d.dates[x.id]);
+  }else if(act==='reopen'){
+    d.deployed=false; d.deployedAt=null; d.enteredAt=Date.now(); d.stage=DEPLOY; state.view=DEPLOY; delete d.dates.deploy;
+  }else if(act==='logreview'){
+    const f=$('rv-alerts'); if(f){ f.scrollIntoView({behavior:'smooth',block:'center'}); f.focus({preventScroll:true}); } return;
+  }else if(act==='depr'){
+    d.stage=DEPR; state.view=DEPR; d.enteredAt=Date.now();
+  }else if(act==='cancelDepr'){
+    leave(d); d.stage=DEPLOY; state.view=DEPLOY; d.enteredAt=Date.now();
+  }else if(act==='restore'){
+    d.deprecated=false; d.deprecatedAt=null; delete d.dates.depr; d.stage=DEPLOY; state.view=DEPLOY; d.enteredAt=Date.now();
+  }
+  render();
+  const head=document.querySelector('.stage-head');
+  if(head.getBoundingClientRect().top<0) head.scrollIntoView({behavior:'smooth',block:'start'});
+  if(act==='loop') flash('Back in Development. Development and Testing checklists were reset; notes are kept.');
+}
+
+$('fSearch').addEventListener('input',renderPipeline);
+$('meName').addEventListener('input',e=>{ state.settings.me=e.target.value.trim(); saveNow(); renderPipeline(); });
+['fTactic','fOwner'].forEach(id=>$(id).addEventListener('change',renderPipeline));
+$('fDep').addEventListener('change',()=>{ state.settings.showDep=$('fDep').checked; renderPipeline(); });
+$('fMine').addEventListener('change',()=>{ state.settings.onlyMine=$('fMine').checked; renderPipeline(); });
+document.querySelector('.tabs').addEventListener('click',e=>{const t=e.target.closest('.tab'); if(!t) return; state.tab=t.dataset.tab; renderTabs(); save();});
+document.querySelector('.tabs').addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight'].includes(e.key)) return;
+  const ids=['pipe','cov','gaps','cal'], i=ids.indexOf(state.tab);
+  state.tab=ids[(i+(e.key==='ArrowRight'?1:3))%4]; renderTabs(); save(); $('t-'+state.tab).focus();
+});
+document.querySelector('.menu-list').addEventListener('click',()=>document.querySelector('.menu').open=false);
+document.addEventListener('click',e=>{const m=document.querySelector('.menu'); if(m.open&&!m.contains(e.target)) m.open=false;});
+$('cov').addEventListener('click',e=>{
+  const b=e.target.closest('[data-cov]'); if(!b) return;
+  $('fTactic').value = $('fTactic').value===b.dataset.cov ? '' : b.dataset.cov;
+  state.tab='pipe'; renderPipeline(); document.querySelector('.overview').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('calRules').addEventListener('click',e=>{
+  const o=e.target.closest('[data-opentest]'); if(!o) return;
+  openDetection(+o.dataset.opentest,TEST);
+});
+$('gapsBody').addEventListener('click',e=>{
+  const o=e.target.closest('[data-open]'); if(!o) return;
+  openDetection(+o.dataset.open,IDX.invest);
+});
+$('copyGaps').addEventListener('click',async()=>{
+  const groups=gapGroups();
+  if(!groups.length){ flash('No gaps recorded yet.'); return; }
+  const md=['# Data gaps',...groups.map(([lab,arr])=>`\n## ${lab} (${arr.length})\n`+arr.map(x=>`- ${label(x.d)}${x.tier?` (${x.tier.name.split(',')[0]})`:''}${x.note?`: ${x.note}`:''}`).join('\n'))].join('\n');
+  try{ await navigator.clipboard.writeText(md); flash('Data gaps copied as Markdown.'); }catch{ flash('Clipboard blocked by the browser.'); }
+});
+$('pipeBody').addEventListener('click',e=>{
+  const o=e.target.closest('[data-open]'), x=e.target.closest('[data-del]');
+  if(o) openDetection(+o.dataset.open);
+  if(x) deleteDetection(+x.dataset.del,x);
+});
+
+const HEAD=['Detection','Stage','Next action','Prioritization','Prioritization tier','Triage','Triage tier','Indicator type','Owner','Techniques','Current stage progress',
+  'Trigger','Tactics','Data sources','Measured prioritization','Measured tier','Data gaps','Created','Deployed','Days to deploy','Last reviewed','Next review','Last review alerts','Last review true positives','Last test','Rule link','Deprecated','Deprecation reason','Replaced by',
+  ...STAGES.map(x=>`Days in ${x.name}`),'Notes'];
+const MD_COLS=[0,2,1,3,5,8,9,10];
+function rows(){
+  return sorted().map(({d,p,t})=>{const m=metaOf(d), a=adjusted(d);return [
+    label(d),stageLabel(d),nextAction(d).label,
+    p.complete?`${p.total}/${p.max}`:'',p.tier?p.tier.name:'',
+    t.complete?`${t.total}/${t.max}`:'',t.tier?t.tier.name:'',
+    indOf(d)?indOf(d).name:'',
+    m.owner, techs(d).join(', '),
+    stageProgress(d),
+    m.source, m.tactics.map(id=>TACTICS.find(x=>x[0]===id)[1]).join(', '), splitList(m.dataSources).join(', '),
+    a&&a.complete?`${a.total}/${a.max}`:'', a&&a.tier?a.tier.name:'',
+    gapsOf(d).map(g=>g.note?`${g.label}: ${g.note}`:g.label).join(' | '),
+    d.created.slice(0,10), d.deployedAt?d.deployedAt.slice(0,10):'', d.deployedAt?Math.round((new Date(d.deployedAt)-new Date(d.created))/DAY):'',
+    d.reviewedAt?d.reviewedAt.slice(0,10):'', reviewDue(d)?reviewDue(d).toISOString().slice(0,10):'',
+    ...(r=>[r&&r.alerts!=null?r.alerts:'', r&&r.tp!=null?r.tp:'', r&&r.test?r.test:''])(lastReview(d)), d.rule||'',
+    d.deprecatedAt?d.deprecatedAt.slice(0,10):'', d.deprecated?d.depr.reason:'', d.deprecated?(()=>{const r=state.dets.find(x=>x.uid===d.depr.replacement); return r?label(r):'';})():'',
+    ...STAGES.map(x=>{const v=spentIn(d,x.id); return v?Math.round(v/DAY*10)/10:'';}),
+    STAGES.filter(s=>d.notes[s.id]).map(s=>`${s.name}: ${d.notes[s.id]}`).join(' | ')
+  ]});
+}
+function download(name,type,text){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); URL.revokeObjectURL(a.href);
+}
+$('copyMd').addEventListener('click',async()=>{
+  const pick=(r)=>MD_COLS.map(i=>r[i]);
+  const md=[`| ${pick(HEAD).join(' | ')} |`,`|${pick(HEAD).map(()=>'---').join('|')}|`,
+    ...rows().map(r=>`| ${pick(r).map(x=>(x||'–').replace(/\|/g,'\\|')).join(' | ')} |`)].join('\n');
+  try{await navigator.clipboard.writeText(md); flash('Markdown copied.')}catch{flash('Clipboard blocked by the browser.')}
+});
+$('dlCsv').addEventListener('click',()=>{
+  const q=v=>`"${String(v).replace(/"/g,'""').replace(/\n/g,' ')}"`;
+  download('detection-pipeline.csv','text/csv',[HEAD,...rows()].map(r=>r.map(q).join(',')).join('\n'));
+});
+function sharedFile(){
+  stamp();
+  // stable order and no personal view settings, so Git diffs stay small and readable
+  const dets=[...state.dets].filter(d=>!isBlank(d)).sort((a,b)=>(a.created<b.created?-1:a.created>b.created?1:0)||(a.uid<b.uid?-1:1)).map(({baseAt,...rest})=>rest);
+  const tombs=[...state.tombs].sort((a,b)=>a.uid<b.uid?-1:1);
+  return JSON.stringify({version:6,savedAt:new Date().toISOString(),savedBy:state.settings.me||'',detections:dets,tombs},null,2);
+}
+function markSynced(){ state.dets.forEach(d=>d.baseAt=d.updatedAt); state.settings.lastShared=new Date().toISOString(); resetSnap(); saveNow(); renderShare(); }
+function renderShare(){
+  const last=state.settings.lastShared, el=$('shareNote'); if(!el) return;
+  const changed=state.dets.filter(d=>!isBlank(d)&&(!last||d.updatedAt>last)).length+state.tombs.filter(t=>!last||t.updatedAt>last).length;
+  if(!changed){ el.className='share-note'; el.textContent=last?`Shared ${fmtAgo(last)}, nothing new since.`:''; return; }
+  const old=!last||Date.now()-new Date(last)>LIMITS.shareDays*DAY;
+  el.className='share-note'+(old?' warn-s':'');
+  el.innerHTML=`${changed} change${changed>1?'s':''} not shared${last?` since ${fmtAgo(last)}`:' yet'}${old&&last?`, over ${LIMITS.shareDays} days`:''}. <button type="button" class="btn ghost" id="shareNow">Save shared file</button>`;
+  $('shareNow').onclick=()=>$('saveJson').click();
+}
+$('saveJson').addEventListener('click',()=>{
+  if(!state.settings.me){ flash('Add your name first, so others can see who changed what.',6000); $('meName').focus(); return; }
+  download('detection-pipeline.json','application/json',sharedFile()); markSynced();
+  flash('Saved detection-pipeline.json. Put it in the shared folder or commit it to the repo.',7000);
+});
+let fileMode='replace';
+$('mergeJson').addEventListener('click',()=>{ fileMode='merge'; $('fileIn').click(); });
+
+function mergeIn(data){
+  const raw=data.detections||[], inc=hydrate(raw), incTombs=Array.isArray(data.tombs)?data.tombs:[], who=data.savedBy||'the file';
+  const r={added:[],updated:[],kept:0,deleted:[],restored:[],conflicts:[]};
+  // files saved before sharing existed have no stable id: match those by name instead
+  inc.forEach((d,k)=>{ if(!raw[k].uid){ const m=state.dets.find(x=>label(x).toLowerCase()===label(d).toLowerCase()); if(m) d.uid=m.uid; } });
+  const local=new Map(state.dets.map(d=>[d.uid,d]));
+  const tomb=new Map(state.tombs.map(t=>[t.uid,t]));
+  inc.forEach(d=>{
+    if(isBlank(d)) return;
+    const mine=local.get(d.uid);
+    if(!mine){
+      const t=tomb.get(d.uid);
+      if(t && t.updatedAt>=d.updatedAt) return;               // we deleted it after their last change
+      if(t){ state.tombs=state.tombs.filter(x=>x.uid!==d.uid); r.restored.push(label(d)); } else r.added.push(label(d));
+      d.id=++uid; d.baseAt=d.updatedAt; state.dets.push(d); return;
+    }
+    if(d.updatedAt===mine.updatedAt) return;
+    const base=mine.baseAt||'', iChanged=mine.updatedAt>base, theyChanged=d.updatedAt>base;
+    if(d.updatedAt>mine.updatedAt){
+      if(iChanged&&theyChanged&&base) r.conflicts.push(`${label(mine)}: you and ${d.updatedBy||who} both changed it. Their newer version was kept.`);
+      d.id=mine.id; state.dets[state.dets.indexOf(mine)]=d; r.updated.push(label(d));
+    }else{
+      if(iChanged&&theyChanged&&base) r.conflicts.push(`${label(mine)}: you and ${d.updatedBy||who} both changed it. Your newer version was kept.`);
+      r.kept++;
+    }
+  });
+  incTombs.forEach(t=>{
+    const mine=state.dets.find(d=>d.uid===t.uid);
+    if(mine){
+      if(mine.updatedAt<=t.updatedAt){ state.dets=state.dets.filter(d=>d!==mine); r.deleted.push(label(mine)); }
+      else { r.conflicts.push(`${label(mine)}: ${t.updatedBy||who} deleted it, but you changed it afterwards. Yours was kept.`); return; }
+    }
+    const have=state.tombs.find(x=>x.uid===t.uid);
+    if(!have) state.tombs.push(t); else if(t.updatedAt>have.updatedAt) Object.assign(have,t);
+  });
+  state.dets.forEach(d=>{ if(d.depr.replacement && !state.dets.some(x=>x.uid===d.depr.replacement)) d.depr.replacement=''; });
+  if(state.dets.some(d=>!isBlank(d))) state.dets=state.dets.filter(d=>!isBlank(d)||d===det());
+  if(state.dets.length>1&&isBlank(det())) state.dets=state.dets.filter(d=>!isBlank(d));
+  if(!state.dets.length) state.dets.push(newDetection());
+  state.cur=Math.min(state.cur,state.dets.length-1);
+  const seen={}; state.dets.forEach(d=>{ const k=label(d).toLowerCase(); seen[k]=(seen[k]||0)+1; });
+  r.dupes=[...new Set(state.dets.filter(d=>seen[label(d).toLowerCase()]>1).map(label))];
+  return r;
+}
+function showReport(r,whose){
+  const list=(arr)=>arr.length?`<ul>${arr.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'';
+  const parts=[r.added.length&&`${r.added.length} added`, r.updated.length&&`${r.updated.length} updated from the file`,
+    r.deleted.length&&`${r.deleted.length} deleted`, r.restored.length&&`${r.restored.length} restored`, r.kept&&`${r.kept} kept as yours (newer)`].filter(Boolean);
+  const el=$('mergeReport'); el.hidden=false;
+  el.innerHTML=`<b>Merged ${esc(whose)}.</b> ${parts.length?parts.join(', ')+'.':'Nothing new, you were already up to date.'}
+    ${r.conflicts.length?`<p style="margin:8px 0 0;color:var(--l2)"><b>Check these, both sides changed them:</b></p>${list(r.conflicts)}`:''}
+    ${r.dupes.length?`<p style="margin:8px 0 0;color:var(--l2)"><b>Same name twice.</b> These were created separately by different people. If they are the same rule, delete one:</p>${list(r.dupes)}`:''}
+    ${r.added.length||r.updated.length?`<details class="gates" style="margin-top:6px"><summary>What changed</summary>${list([...r.added.map(x=>'Added: '+x),...r.updated.map(x=>'Updated: '+x),...r.deleted.map(x=>'Deleted: '+x)])}</details>`:''}
+    <div><button class="btn ghost" id="closeReport">Close</button></div>`;
+  $('closeReport').onclick=()=>{ el.hidden=true; };
+  state.tab='pipe';
+}
+$('loadJson').addEventListener('click',()=>{ fileMode='replace'; $('fileIn').click(); });
+
+/* CSV import: adds detections, never overwrites. Headers are matched loosely. */
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  text=text.replace(/^\uFEFF/,'');
+  const sep=(text.split('\n')[0].split(';').length>text.split('\n')[0].split(',').length)?';':',';
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===sep){ row.push(f); f=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(f); rows.push(row); row=[]; f=''; }
+    else f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()!==''));
+}
+const CSV_FIELDS={
+  name:['name','detection','rulename','title'],
+  owner:['owner'],
+  stage:['stage','status'],
+  techniques:['techniques','technique','techniqueids','attacktechniques'],
+  tactics:['tactics','tactic'],
+  dataSources:['datasources','datasource','logsources'],
+  source:['trigger','requestsource','source'],
+  created:['created','requested','requestedon','createdon'],
+  deployedAt:['deployed','deployedon','deploydate'],
+  reviewedAt:['lastreviewed','reviewed','reviewedon'],
+  deprecatedAt:['deprecated','deprecatedon','retiredon'],
+  rule:['rulelink','rule','ruleid','link','url'],
+};
+const norm=(x)=>String(x||'').toLowerCase().replace(/[^a-z]/g,'');
+function csvDate(v){ if(!v||!v.trim()) return null; const t=new Date(/^\d{4}-\d{2}-\d{2}$/.test(v.trim())?v.trim()+'T12:00:00':v); return isNaN(t)?null:t.toISOString(); }
+function importCSV(text){
+  const rows=parseCSV(text); if(rows.length<2) return {added:0,skipped:0,dupes:0,error:'The file has no data rows.'};
+  const head=rows[0].map(norm), col={};
+  for(const [k,al] of Object.entries(CSV_FIELDS)){ const i=head.findIndex(h=>al.includes(h)); if(i>=0) col[k]=i; }
+  if(col.name==null) return {added:0,skipped:0,dupes:0,error:'No name column found. Use a header called Name or Detection.'};
+  const existing=new Set(state.dets.map(d=>label(d).toLowerCase()));
+  let added=0, skipped=0, dupes=0;
+  rows.slice(1).forEach(r=>{
+    const get=(k)=>col[k]!=null?(r[col[k]]||'').trim():'';
+    const name=get('name'); if(!name){ skipped++; return; }
+    if(existing.has(name.toLowerCase())){ dupes++; return; }
+    const d=newDetection(name), m=metaOf(d); d.rule=get('rule');
+    m.owner=get('owner'); m.techniques=get('techniques'); m.dataSources=get('dataSources');
+    const src=get('source'); if(src) m.source=SOURCES.find(x=>norm(x)===norm(src))||'Other';
+    m.tactics=splitList(get('tactics').replace(/\|/g,',')).map(t=>(TACTICS.find(([id,n])=>norm(id)===norm(t)||norm(n)===norm(t))||[])[0]).filter(Boolean);
+    const created=csvDate(get('created')); if(created) d.created=created;
+    const dep=csvDate(get('deployedAt')), rev=csvDate(get('reviewedAt')), st=norm(get('stage'));
+    const idx=STAGES.findIndex(x=>[norm(x.name),norm(x.short),norm(x.id)].includes(st));
+    if(['deprecated','retired','disabled'].includes(st)){ d.deployed=true; d.stage=DEPLOY; d.deprecated=true; d.deprecatedAt=csvDate(get('deprecatedAt'))||new Date().toISOString(); d.dates.depr=d.deprecatedAt; }
+    else if(['deployed','live','production','enabled','active'].includes(st)||(!st&&dep)||st==='deprecating'){
+      d.deployed=true; d.stage=st==='deprecating'?DEPR:DEPLOY;
+    }
+    else if(idx>=0 && idx!==DEPR) d.stage=idx;
+    if(d.deployed){ d.deployedAt=dep||d.created; d.dates.deploy=d.deployedAt; d.reviewedAt=rev||d.deployedAt; if(rev) d.reviews.push({at:rev}); }
+    state.dets.push(d); existing.add(name.toLowerCase()); added++;
+  });
+  // drop an untouched blank detection so the import is not cluttered by it
+  if(added){ const keep=state.dets.filter(d=>!isBlank(d)); if(keep.length) { state.dets=keep; state.cur=0; state.view=det().stage; } }
+  return {added,skipped,dupes};
+}
+$('importCsv').addEventListener('click',()=>$('csvIn').click());
+$('csvIn').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=importCSV(await f.text()); e.target.value='';
+  if(r.error){ flash(r.error,8000); return; }
+  state.tab='pipe'; render();
+  const extra=[r.dupes?`${r.dupes} already existed`:'', r.skipped?`${r.skipped} had no name`:''].filter(Boolean).join(', ');
+  flash(`Imported ${r.added} detection${r.added===1?'':'s'}${extra?` (${extra}, skipped)`:''}. Scores are not imported, so score them when you pick them up.`,9000);
+});
+$('csvTemplate').addEventListener('click',()=>{
+  const rows=[['Name','Owner','Stage','Techniques','Tactics','Data sources','Trigger','Created','Deployed','Last reviewed'],
+    ['LSASS access by unsigned process','Åsmund','Deployed','T1003.001','Credential Access','Sysmon, Elastic Defend','Threat intel','2026-03-02','2026-03-20','2026-08-15'],
+    ['Kerberoasting RC4 tickets','Kari','Investigation','T1558.003','Credential Access','Windows Security','Red or purple team','2026-09-10','','']];
+  download('detection-import-template.csv','text/csv',rows.map(r=>r.map(v=>`"${v.replace(/"/g,'""')}"`).join(',')).join('\n'));
+});
+$('fileIn').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!Array.isArray(data.detections)) throw new Error();
+    e.target.value='';
+    if(fileMode==='merge'){
+      const r=mergeIn(data); state.view=Math.min(det().stage,LAST); markSynced(); render(); showReport(r,data.savedBy?`${data.savedBy}'s file`:'the file');
+      $('mergeReport').scrollIntoView({block:'nearest'});
+      return;
+    }
+    ask(document.querySelector('.ov-hint'),`Replace all ${state.dets.length} detection${state.dets.length===1?'':'s'} in this browser with the ${data.detections.length} in the file? Anything not in the file is lost. Use Merge to combine instead.`,'Replace everything',()=>{
+      state.dets=hydrate(data.detections.length?data.detections:[newDetection()]); state.tombs=Array.isArray(data.tombs)?data.tombs:[];
+      state.cur=0; state.view=det().stage; markSynced(); render();
+      flash(`Loaded ${state.dets.length} detection${state.dets.length===1?'':'s'} from the file.`);
+    },true);
+    return;
+  }catch{ flash('That file is not a saved pipeline. Choose a JSON file made with Save shared file.',6000); }
+  e.target.value='';
+});
+
+load();
+render();
+</script>
+</body>
+</html>
