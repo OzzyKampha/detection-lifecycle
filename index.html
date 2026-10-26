@@ -681,8 +681,9 @@ const HOWTO={
     '<b>Score the threat and the work, not the detection idea.</b> Open <b>What do the levels mean?</b> under each criterion.',
     '<b>Answer for your organisation.</b> Impact and relevance depend on what you run and what matters to you, not on how serious the threat sounds in the news.',
     'Scoring gates can cap the tier, for example a threat that is not relevant is parked. Open <b>Scoring gates</b> in the score panel to see them.',
-    'The next action combines this tier with the prioritization tier, and the slower one sets the pace. Select <b>Complete Triage</b> when it is scored.'],
-    tip:'Write in the notes why it scored this way and which sprint it was given.'},
+    'The result says when to start: <b>Build now</b>, <b>Build next sprint</b> or <b>Backlog</b>. The slower of this tier and the prioritization tier sets the pace.',
+    'Leave the detection here until work starts, then select <b>Complete Triage</b>. The next action then shows the work, such as Investigate or Develop.'],
+    tip:'Write in the notes why it scored this way and which sprint it was given. If a backlog item waits for months, re-score it or park it.'},
   invest:{title:'How to use this stage',steps:[
     'Choose the <b>indicator type</b> the rule will key on. Higher on the pyramid is harder for the attacker to change.',
     'Go through the <b>log source review</b> with real data in front of you. Mark each check OK, Partial or Gap, and say what is missing.',
@@ -838,6 +839,7 @@ function dueText(due){
   return diff<0 ? `overdue by ${n} day${n===1?'':'s'}` : n===0 ? 'due today' : `due in ${n} day${n===1?'':'s'}`;
 }
 // One answer to "what should happen next" for each detection. order drives the pipeline ranking.
+const WORK={invest:'Investigate',dev:'Develop',test:'Test',deploy:'Deploy'};
 function nextAction(d){
   const A=(label,t,order,why)=>({label,t,order,why});
   if(d.deprecated) return A('Deprecated',0,14,'Retired and no longer counted in coverage.');
@@ -860,9 +862,12 @@ function nextAction(d){
   if(d.stage===TEST && MEASURED.some(k=>ms[k]!=null&&d.scores.prio[k]!=null&&d.scores.prio[k]-ms[k]>=2))
     return A('Send back to Development',3,3,'Testing measured at least one criterion 2 or more below prediction.');
   const o=Math.max(pv.tier.t,t.tier.t), pair=`Detection value ${pv.tier.name.split(',')[0]}${pv===adj?' (measured)':''} from prioritization, threat urgency ${t.tier.name.split(',')[0]} from triage. The slower of the two sets the pace.${partials(d).length?' Data is only partly available, so it will see part of the estate.':''}`;
-  if(o===1) return A('Build now',1,2,pair);
-  if(o===2) return A('Build next sprint',2,5,pair);
-  return A('Backlog',3,9,pair);
+  // past Triage the work has started: say what to do now, and rank it just ahead of waiting work of the same tier
+  const ord=o===1?2:o===2?5:9;
+  if(d.stage>IDX.triage) return A(WORK[STAGES[d.stage].id],1,ord-.5,`${STAGES[d.stage].name} in progress. ${pair}`);
+  if(o===1) return A('Build now',1,ord,pair);
+  if(o===2) return A('Build next sprint',2,ord,pair);
+  return A('Backlog',3,ord,pair);
 }
 function setDate(d,key,val){
   if(!val) return;                                   // ignore cleared inputs, a date is always needed

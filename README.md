@@ -49,6 +49,8 @@ Each criterion is scored 1 to 4, and higher is always better. That is why comple
 
 The **next action** for a detection combines both tiers, and the slower of the two sets the pace. A great detection for a threat that does not affect you can wait, and an urgent threat with a weak detection idea needs a better idea first.
 
+Build now, Build next sprint and Backlog say when to *start*. A detection waits in Triage until someone picks it up, then **Complete Triage** moves it to Investigation. From there the next action shows the work instead: Investigate, Develop, Test or Deploy, with the tiers kept in the explanation. Work in progress is ranked just ahead of waiting work of the same tier, so started detections get finished first. A backlog item that waits for months should be re-scored or parked.
+
 **Scoring gates** are hard rules that cap a tier whatever the total says. A threat that is not relevant is parked, and a detection that is very noisy or has low confidence cannot be higher than P3. Gates can be switched off from any scored stage if you want the raw dashboard result.
 
 Testing re-scores the four criteria it can actually measure (coverage, confidence, noisiness and attacker cost). The measured values replace the predictions, so the prioritization can go up or down after testing. The original prediction is kept, and the Prediction check view shows whether your team tends to score high or low.
