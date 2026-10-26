@@ -248,7 +248,8 @@ td.num{font-variant-numeric:tabular-nums}
 .ex-banner[hidden]{display:none}
 td[data-l="Next action"] .na{white-space:normal;display:inline-block;max-width:150px}
 .ex-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1.5px dashed var(--muted);border-radius:10px;font-size:.93rem}
-.dh-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dh-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0;max-width:100%}
+.dh-right select{max-width:100%;min-width:0;text-overflow:ellipsis}
 .history{margin-top:40px;border-top:1.5px solid var(--line);padding-top:14px}
 .history summary{cursor:pointer;font-family:"Familjen Grotesk",system-ui,sans-serif;font-weight:600;font-size:1.1rem}
 .history .cnt{font-family:"Atkinson Hyperlegible",system-ui,sans-serif;font-size:.78rem;font-weight:700;background:var(--empty);color:var(--muted);border-radius:999px;padding:1px 7px;margin-left:4px}
@@ -385,8 +386,9 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
 .menu{position:relative;margin-bottom:8px}
 .menu summary{list-style:none;font-size:.9rem;padding:7px 12px}
 .menu summary::-webkit-details-marker{display:none}
-.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:5;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:6px;display:grid;min-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
-.menu-list button{background:none;border:0;text-align:left;white-space:nowrap;padding:9px 10px;border-radius:6px;cursor:pointer}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:5;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:6px;display:grid;min-width:min(280px,calc(100vw - 24px));max-width:calc(100vw - 24px);box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.menu-list.left{right:auto;left:0}
+.menu-list button{background:none;border:0;text-align:left;white-space:normal;padding:9px 10px;border-radius:6px;cursor:pointer}
 .menu-list button:hover{background:var(--paper)}
 .menu-list hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 @media (max-width:1000px){.cov{grid-template-columns:repeat(4,1fr)}}
@@ -1814,6 +1816,11 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{
   state.tab=ids[(i+(e.key==='ArrowRight'?1:3))%4]; renderTabs(); save(); $('t-'+state.tab).focus();
 });
 document.querySelector('.menu-list').addEventListener('click',()=>document.querySelector('.menu').open=false);
+// open the menu towards the side with room: on phones the button wraps to the left edge
+document.querySelector('.menu').addEventListener('toggle',e=>{
+  const l=e.target.querySelector('.menu-list'); if(!e.target.open) return;
+  l.classList.remove('left'); if(l.getBoundingClientRect().left<8) l.classList.add('left');
+});
 document.addEventListener('click',e=>{const m=document.querySelector('.menu'); if(m.open&&!m.contains(e.target)) m.open=false;});
 $('cov').addEventListener('click',e=>{
   const b=e.target.closest('[data-cov]'); if(!b) return;
