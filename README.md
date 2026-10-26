@@ -53,6 +53,36 @@ The **next action** for a detection combines both tiers, and the slower of the t
 
 Testing re-scores the four criteria it can actually measure (coverage, confidence, noisiness and attacker cost). The measured values replace the predictions, so the prioritization can go up or down after testing. The original prediction is kept, and the Prediction check view shows whether your team tends to score high or low.
 
+## How to rate a request
+
+Every criterion has a **What do the levels mean?** list in the tool, so a 3 means the same thing whoever gives it. The prioritization levels are:
+
+| Criterion | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| Coverage | One tool or one exact command line | A few known procedures | Most known procedures and variants | The technique itself, whatever the tool |
+| Durability | Breaks on the next tool release or log format change | Tied to one tool's artefacts | Tied to behaviour | Tied to what the technique must do |
+| Complexity | Anomaly model, multi-stage correlation or a new parser | Aggregation, thresholds or joins | A few conditions on one source | A single event and field match |
+| Confidence | Most hits benign, a hunting lead | Admin work often looks the same | Rare legitimate use, short known list | No legitimate use here |
+| Noisiness | Over 20 false positives a week | 5 to 20 a week | 1 to 5 a week | Under 1 a week |
+| Actionable content | Analyst rebuilds the story | Analyst pivots to raw logs | Who, what, where, next step obvious | Plus why it matters and a playbook |
+| Attacker cost | Change a hash, IP or domain | Rename, recompile or change an argument | Switch tool or method | Abandon the technique |
+
+Noisiness uses the same bands as the production reviews, so predictions and measurements compare directly. Attacker cost follows the Pyramid of Pain.
+
+Keep the criteria apart. **Coverage** counts variants of the technique, not how much of the estate sends logs: missing logs are data gaps, recorded in Investigation. **Durability** is about keeping working without upkeep. **Attacker cost** is about deliberate evasion.
+
+For triage, impact runs from a nuisance (1) to critical operations stopping, a large breach or domain-wide control (4). Relevance runs from technology you do not run (1, parked automatically) to technology you run widely and attackers who target organisations like yours (4). *In the wild* means credible reporting of real use in the last 12 months. *Easy to execute* means a public tool or proof of concept works without changes.
+
+A few habits make the scores more honest:
+
+- Rate the idea you would actually build. Two different approaches are two detections.
+- Check cheap evidence first. A quick search over the last 7 days says a lot about noisiness and confidence.
+- When torn between two levels, pick the lower one and write why in the notes.
+- Score two or three of the example detections together once as a team, and talk through where you disagree.
+- After a few months, open Prediction check to see whether the team rates high or low.
+
+Each stage and overview view also has a short **How to use** box. Fold the ones you know, or hide them all and turn them back on under **Share and export**.
+
 ## Thresholds
 
 The flags in the tool use these limits. They are defined in one place at the top of the script (`LIMITS` and `NOISE_BANDS`) if your team wants different numbers.

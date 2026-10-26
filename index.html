@@ -208,6 +208,15 @@ td.num{font-variant-numeric:tabular-nums}
 .mf small{color:var(--muted);font-size:.82rem}
 .mf small.bad{color:var(--l1)}
 .mf .optional{font-weight:400;color:var(--muted)}
+.howto{background:var(--surface);border:1.5px solid var(--line);border-left:4px solid var(--ink);border-radius:10px;padding:10px 16px;margin:10px 0 16px;max-width:76ch}
+.howto summary{cursor:pointer;font-weight:700}
+.howto ol{margin:8px 0 4px;padding-left:22px}.howto li{margin:4px 0}
+.howto p{margin:6px 0;color:var(--muted);font-size:.92rem}
+.howto .linkbtn{font-weight:400;color:var(--muted);font-size:.85rem}
+.levels{margin:4px 0 0;font-size:.88rem}.levels summary{cursor:pointer;color:var(--muted);text-decoration:underline;width:max-content}
+.levels ol{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px}.levels li{display:grid;grid-template-columns:9em 1fr;gap:8px;padding:3px 6px;border-radius:6px}
+.levels li.sel{background:var(--surface);outline:1.5px solid var(--line)}
+@media (max-width:560px){.levels li{grid-template-columns:1fr;gap:0}}
 .tactics{display:flex;flex-wrap:wrap;gap:6px}
 .tac{background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:.85rem}
 .tac[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -271,7 +280,7 @@ td[data-l="Next action"] .na{white-space:normal;display:inline-block;max-width:1
   #stageBody .crit>.crit-head{margin-bottom:2px}
   #stageBody .crit>p{margin:0}
   #stageBody .crit>.opts{grid-column:2;grid-row:1 / span 3}
-  #stageBody .crit>.note{grid-column:1 / -1}
+  #stageBody .crit>.note,#stageBody .crit>.levels{grid-column:1 / -1}
   #stageBody .opt{padding:7px 6px}
   #stageBody .opt .lbl{font-size:.82rem}
 }
@@ -451,6 +460,7 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
           <button id="copyGaps">Copy data gaps as Markdown</button>
           <hr>
           <button id="exToggle">Load example data</button>
+          <button id="tipsToggle">Hide how-to tips</button>
           <hr>
           <button id="importCsv">Import detections (CSV)</button>
           <button id="csvTemplate">Download CSV import template</button>
@@ -468,6 +478,7 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
     <div class="ex-banner" id="exBanner" hidden><span><b>Example data is loaded.</b> It is made up, stays in this browser, and is never included in the shared file.</span><button type="button" class="btn ghost" id="exRemove">Remove example data</button></div>
     <div class="merge-report" id="mergeReport" hidden></div>
     <div class="tp" role="tabpanel" id="p-pipe" aria-labelledby="t-pipe">
+      <details class="howto" data-howto="pipe"></details>
       <p class="sub" id="pipeSub">Ranked by next action, then prioritization and triage scores.</p>
       <p class="cycle" id="cycle"></p>
       <div class="filters">
@@ -486,6 +497,7 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
     </div>
 
     <div class="tp" role="tabpanel" id="p-cov" aria-labelledby="t-cov" hidden>
+      <details class="howto" data-howto="cov"></details>
       <p class="sub">Tactics and techniques from Requirements Discovery. Select a tactic to filter the pipeline.</p>
       <p class="cycle" id="covSummary"></p>
       <div class="cov" id="cov"></div>
@@ -493,11 +505,13 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
     </div>
 
     <div class="tp" role="tabpanel" id="p-gaps" aria-labelledby="t-gaps" hidden>
+      <details class="howto" data-howto="gaps"></details>
       <p class="sub">Log source gaps and partial coverage from Investigation. Missing data first, then partly missing, each ranked by how many detections it affects.</p>
       <div class="gaps-body" id="gapsBody"></div>
     </div>
 
     <div class="tp" role="tabpanel" id="p-cal" aria-labelledby="t-cal" hidden>
+      <details class="howto" data-howto="cal"></details>
       <p class="sub">Requirements Discovery predictions compared with what Testing measured.</p>
       <div id="calEmpty"></div>
       <div id="calWrap" hidden>
@@ -534,6 +548,7 @@ tr.confirm-row td{white-space:normal;background:var(--paper)}
   <p class="next" id="nextAction" aria-live="polite"></p>
 
   <div class="stage-head"><h2 id="stageTitle"></h2><p id="stagePurpose"></p></div>
+  <details class="howto" id="stageHowto" data-howto="req"></details>
 
   <div class="layout">
     <section id="stageBody" role="tabpanel"></section>
@@ -554,13 +569,13 @@ const L4 = (labels) => labels.map((l,i)=>({v:i+1,l}));
 const SCORING = {
   prio:{
     criteria:[
-      {id:'coverage',short:'Coverage',name:'Coverage',help:'How much of the technique and its variants would the detection catch?',opts:L4(['Low','Medium','High','Excellent'])},
-      {id:'durability',short:'Durable',name:'Durability',help:'Will it survive tool updates, renamed binaries and small attacker changes?',opts:L4(['Low','Medium','High','Excellent'])},
-      {id:'complexity',short:'Simple',name:'Complexity',help:'How hard is the logic to build, maintain and explain? Simpler scores higher.',opts:L4(['High','Medium','Low','Minimal'])},
-      {id:'confidence',short:'Confid.',name:'Confidence',help:'When it fires, how sure would you be that it is truly malicious?',opts:L4(['Low','Medium','High','Excellent'])},
-      {id:'noise',short:'Quiet',name:'Noisiness',help:'Expected false positive volume in your environment.',opts:L4(['Very noisy','Noisy','Low noise','Silent precision'])},
-      {id:'action',short:'Action',name:'Actionable content',help:'Would the alert carry the context and next steps an analyst needs?',opts:L4(['Vague','Partial','Actionable','Fully guided'])},
-      {id:'cost',short:'Evasion',name:'Attacker cost',help:'What would it cost the attacker to evade this detection?',opts:L4(['Trivial bypass','Easy bypass','Costly bypass','Forces pivot'])},
+      {id:'coverage',short:'Coverage',name:'Coverage',help:'How many variants and procedures of the technique would it catch? Missing logs do not count here, they are recorded as data gaps in Investigation.',levels:['One tool or one exact command line','A few known procedures for the technique','Most known procedures and variants of the technique','The technique itself, whatever tool or procedure is used'],opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'durability',short:'Durable',name:'Durability',help:'How long would it keep working without anyone touching it, through product updates, log format changes and new legitimate software?',levels:['Breaks on the next tool release or log format change','Tied to one tool’s artefacts, needs regular upkeep','Tied to behaviour, survives normal product and environment changes','Tied to what the technique must do, years without changes'],opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'complexity',short:'Simple',name:'Complexity',help:'How hard is the logic to build, maintain and explain? Simpler scores higher.',levels:['Anomaly model, multi-stage correlation or a new parser','Aggregation, thresholds or joins across sources','A few conditions and exclusions on one source','A single event and field match'],opts:L4(['High','Medium','Low','Minimal'])},
+      {id:'confidence',short:'Confid.',name:'Confidence',help:'When it fires, how sure would you be that it is truly malicious?',levels:['Most hits will be benign: a hunting lead, not an alert','Legitimate admin work often looks the same, needs context to judge','Rare legitimate use, explained by a short known list','No legitimate use in our environment'],opts:L4(['Low','Medium','High','Excellent'])},
+      {id:'noise',short:'Quiet',name:'Noisiness',help:'Expected false positive volume in your environment.',levels:['More than 20 false positives a week','5 to 20 false positives a week','1 to 5 false positives a week','Under 1 false positive a week'],opts:L4(['Very noisy','Noisy','Low noise','Silent precision'])},
+      {id:'action',short:'Action',name:'Actionable content',help:'Would the alert carry the context and next steps an analyst needs?',levels:['Says something happened, the analyst rebuilds the story','Some fields, the analyst must pivot to raw logs','Who, what and where, and the next step is obvious','All of that, plus why it matters and a linked playbook'],opts:L4(['Vague','Partial','Actionable','Fully guided'])},
+      {id:'cost',short:'Evasion',name:'Attacker cost',help:'What would an attacker who knows about this detection have to change to avoid it?',levels:['Change a hash, IP address or domain','Rename, recompile or change an argument','Switch to another tool or method for the same goal','Abandon the technique altogether'],opts:L4(['Trivial bypass','Easy bypass','Costly bypass','Forces pivot'])},
     ],
     tiers:[
       {min:.85,t:1,name:'P1, deploy immediately',advice:'High-value detection. Prioritise for immediate production deployment and playbook creation.'},
@@ -571,10 +586,10 @@ const SCORING = {
   },
   triage:{
     criteria:[
-      {id:'impact',short:'Impact',name:'Organizational impact',help:'How badly would the organization be hurt if this attack succeeded undetected?',opts:L4(['Minimal','Moderate','Significant','Critical'])},
-      {id:'relevance',short:'Relevance',name:'Organizational relevance',help:'Does this threat apply to your environment, industry and tech stack?',opts:L4(['Not relevant','Marginal','Relevant','Directly relevant'])},
-      {id:'wild',short:'In wild',name:'Exploit in the wild exists',help:'Is the technique or exploit being used by real adversaries right now?',opts:[{v:4,l:'Yes'},{v:1,l:'No'}]},
-      {id:'easy',short:'Easy',name:'Easy to execute',help:'If an exploit exists, can a low-skilled attacker run it reliably?',opts:[{v:4,l:'Yes'},{v:2,l:'No'}],dependsOn:'wild'},
+      {id:'impact',short:'Impact',name:'Organizational impact',help:'How badly would the organization be hurt if this attack succeeded undetected?',levels:['Nuisance: nothing lost and no service affected','One system or user, contained and easy to recover','Sensitive data or an important service affected','Critical operations stop, a large breach or domain-wide control'],opts:L4(['Minimal','Moderate','Significant','Critical'])},
+      {id:'relevance',short:'Relevance',name:'Organizational relevance',help:'Does this threat apply to your environment, industry and tech stack?',levels:['We do not run the technology, or the threat cannot reach us','We run it only at the edges or on a few systems','We run it widely','We run it widely, and attackers target organisations like ours'],opts:L4(['Not relevant','Marginal','Relevant','Directly relevant'])},
+      {id:'wild',short:'In wild',name:'Exploit in the wild exists',help:'Is the technique or exploit being used by real adversaries right now?',levels:['Credible reporting of real use in the last 12 months, for example CISA KEV or a vendor report','No reported use, or only a lab proof of concept'],opts:[{v:4,l:'Yes'},{v:1,l:'No'}]},
+      {id:'easy',short:'Easy',name:'Easy to execute',help:'If an exploit exists, can a low-skilled attacker run it reliably?',levels:['A public tool or proof of concept works without changes','Needs custom work, special access or skill to run reliably'],opts:[{v:4,l:'Yes'},{v:2,l:'No'}],dependsOn:'wild'},
       {id:'time',short:'Effort',name:'Required time to build',help:'Effort to investigate, develop, test and tune the detection. Faster scores higher.',opts:L4(['> 2 weeks','1–2 weeks','1–3 days','< 1 day'])},
     ],
     tiers:[
@@ -632,6 +647,73 @@ const STAGES = [
     items:['Reason documented and agreed with the owner','Coverage checked: a replacement is live, or the gap is accepted','Rule disabled in production','Rule archived in version control with the reason','Playbook and coverage map updated','SOC informed']},
 ];
 STAGES.forEach(s=>{ if(s.groups) s.items=s.groups.flatMap(g=>g.items); });
+
+// "How to use" boxes for each overview tab and each stage. Static text, so plain HTML is fine here.
+const HOWTO={
+  pipe:{title:'How to use the pipeline',steps:[
+    '<b>Work from the top.</b> Rows are ranked by <b>Next action</b>, so the most urgent work comes first. Hover a badge to see why it was given.',
+    '<b>Detection value</b> and <b>Threat urgency</b> are the two scores, from P1 (best) to P4. The slower of the two tiers decides when a detection gets built.',
+    'Select <b>Open</b> to work on a detection, or <b>New detection</b> to file a new request.',
+    'Working in a team? <b>Merge a shared file</b> before you start and <b>Save shared file</b> when you are done, both under Share and export.']},
+  cov:{title:'How to use the coverage view',steps:[
+    'Each tile is an ATT&amp;CK tactic. The colour shows whether it has a deployed detection, only work in progress, or nothing at all.',
+    'Select a tactic to filter the pipeline to its detections.',
+    'An empty tactic that matters to you is a candidate for a new request: select <b>New detection</b> and choose <b>Coverage gap</b> as the trigger.'],
+    tip:'Tactics and techniques come from Requirements Discovery. A detection without them does not show up here.'},
+  gaps:{title:'How to use the data gaps view',steps:[
+    'Each row is a missing or partly missing log source, recorded in the Investigation log source review.',
+    'Gaps that block detections come first, then partial coverage. Fixing the top rows unblocks the most work.',
+    'Select a detection to open it. When the data is fixed, mark the check <b>OK</b> there and the row disappears.',
+    'Use <b>Copy data gaps as Markdown</b> under Share and export to hand the list to the logging or platform team.'],
+    tip:'Keep this list private. Together with the coverage map it shows exactly what you cannot see.'},
+  cal:{title:'How to use the prediction check',steps:[
+    'Each row compares what Requirements Discovery predicted with what Testing measured, for coverage, confidence, noisiness and attacker cost.',
+    'Look at <b>Across all detections</b>. A steady miss in one direction means the team rates that criterion too high or too low.',
+    'Use it when rating new requests. If noisiness keeps coming out worse than predicted, rate it one level lower.'],
+    tip:'The view fills up as detections pass Testing. Production noise comes from the reviews logged on live rules.'},
+  req:{title:'How to rate this request',steps:[
+    '<b>Describe the request.</b> Choose what triggered it and who owns it, and add tactics, technique IDs and data sources. Requested by and Context are optional.',
+    '<b>Score the detection idea, not the threat.</b> Open <b>What do the levels mean?</b> under each criterion and pick the level whose description fits best.',
+    '<b>Check cheap evidence first.</b> A quick search over the last 7 days says a lot about noisiness and confidence. When torn between two levels, pick the lower one and write why in the notes.',
+    'The tier appears in the score panel once all seven are scored. P4 means rethink the idea first. Then select <b>Complete Requirements</b>.'],
+    tip:'Rate the idea you would actually build. Two different approaches should be two detections. Testing re-checks coverage, confidence, noisiness and attacker cost later.'},
+  triage:{title:'How to rate the threat',steps:[
+    '<b>Score the threat and the work, not the detection idea.</b> Open <b>What do the levels mean?</b> under each criterion.',
+    '<b>Answer for your organisation.</b> Impact and relevance depend on what you run and what matters to you, not on how serious the threat sounds in the news.',
+    'Scoring gates can cap the tier, for example a threat that is not relevant is parked. Open <b>Scoring gates</b> in the score panel to see them.',
+    'The next action combines this tier with the prioritization tier, and the slower one sets the pace. Select <b>Complete Triage</b> when it is scored.'],
+    tip:'Write in the notes why it scored this way and which sprint it was given.'},
+  invest:{title:'How to use this stage',steps:[
+    'Choose the <b>indicator type</b> the rule will key on. Higher on the pyramid is harder for the attacker to change.',
+    'Go through the <b>log source review</b> with real data in front of you. Mark each check OK, Partial or Gap, and say what is missing.',
+    'Study the technique and normal activity in your environment, and list the likely false positives.',
+    'Select <b>Complete Investigation</b> when the data is there and you know what to match and what to exclude.'],
+    tip:'Gaps and partials show up in the Data gaps view, so the logging team can see what blocks your work.'},
+  dev:{title:'How to use this stage',steps:[
+    'Write the rule from what Investigation found, and put a link to it in <b>Where the rule lives</b>.',
+    'Make the alert useful: severity, the context fields an analyst needs, and the ATT&amp;CK mapping.',
+    'Store it in version control and get it peer reviewed.',
+    'Tick the checklist as you go, then select <b>Complete Development</b>.']},
+  test:{title:'How to use this stage',steps:[
+    'Prove it fires: run an emulation (Atomic Red Team or by hand) and confirm a true positive.',
+    'Try variants and evasions, and run the rule over historical data to estimate alert volume.',
+    'Re-score what you measured under <b>Predicted vs measured</b>, using the same level descriptions as Requirements Discovery.',
+    'Select <b>Complete Testing</b>, or <b>Send back to Development</b> if it misses or is too noisy.'],
+    tip:'The measured scores replace the predictions, and the Prediction check view shows how far off the team was.'},
+  deploy:{title:'How to use this stage',steps:[
+    'Before going live: playbook written, analysts briefed, routing and severity checked in the SOC queue.',
+    'Select <b>Mark as deployed</b> once it is live.',
+    'At each review, select <b>Log a review</b> and enter the alert count, the true positives and whether the test was re-run. Noise, silence and failed tests are flagged in Next action.',
+    'Change <b>Review every</b> if this rule needs closer watching.'],
+    tip:'When a rule is no longer needed, select Start deprecation rather than just disabling it, so no coverage gap opens by accident.'},
+  depr:{title:'How to use this stage',steps:[
+    'Choose the <b>reason</b> and the detection that <b>replaces</b> it, if there is one.',
+    'Check coverage: a replacement is live, or the owner accepts the gap.',
+    'Disable and archive the rule, update the playbook and coverage map, and tell the SOC.',
+    'Select <b>Complete deprecation</b>. You can restore the rule later.']},
+};
+// level lists the user opened, kept open while the stage re-renders after each click
+const openLevels=new Set();
 
 // Indicator types, ordered by the Pyramid of Pain (David Bianco): higher means more painful for the attacker to change
 const INDICATORS=[
@@ -856,6 +938,7 @@ function renderStage(){
   const d=det(), s=STAGES[state.view];
   $('stageTitle').textContent=`${state.view+1}. ${s.name}`;
   $('stagePurpose').textContent=s.purpose;
+  $('stageHowto').dataset.howto=s.id; renderHowtos();
   let html='';
   if(s.score){
     const isP=s.score==='prio';
@@ -890,6 +973,7 @@ function renderStage(){
       return `<div class="crit">
         <div class="crit-head"><h3 id="h-${c.id}">${c.name}</h3><span class="val">${val??'–'} / 4</span></div>
         <p>${c.help}</p>
+        ${levelsHtml(c,sc[c.id],s.score)}
         <div class="opts ${cols}" role="group" aria-labelledby="h-${c.id}">
           ${c.opts.map(o=>`<button class="opt" data-c="${c.id}" data-v="${o.v}" data-l="${o.v}" aria-pressed="${sc[c.id]===o.v&&!dis}" ${dis?'disabled':''}>
             ${c.opts.length===4?`<span class="pts">${o.v}</span>`:''}<span class="lbl">${o.l}</span></button>`).join('')}
@@ -957,6 +1041,7 @@ function renderStage(){
         return `<div class="crit">
           <div class="crit-head"><h3 id="mh-${id}">${c.name}</h3>${deltaPill(pv,mv)}</div>
           <p class="pred">Predicted: ${pv?`${pv}, ${c.opts[pv-1].l}`:'not scored'}</p>
+          ${levelsHtml(c,mv,'m')}
           <div class="opts c4" role="group" aria-labelledby="mh-${id}">${c.opts.map(o=>`<button class="opt" data-mc="${id}" data-v="${o.v}" data-l="${o.v}" aria-pressed="${mv===o.v}"><span class="pts">${o.v}</span><span class="lbl">${o.l}</span></button>`).join('')}</div>
         </div>`;
       }).join('');
@@ -967,6 +1052,25 @@ function renderStage(){
   $('stageBody').innerHTML=html;
 }
 
+function levelsHtml(c,val,scope){
+  if(!c.levels) return '';
+  const key=`${scope}.${c.id}`;
+  return `<details class="levels" data-lv="${key}" ${openLevels.has(key)?'open':''}><summary>What do the levels mean?</summary><ol>${c.opts.map((o,k)=>`<li class="${val===o.v?'sel':''}"><b>${c.opts.length===4?o.v+' ':''}${o.l}</b><span>${c.levels[k]}</span></li>`).join('')}</ol></details>`;
+}
+function howtoHtml(key){
+  const h=HOWTO[key];
+  return `<summary>${h.title}</summary><ol>${h.steps.map(x=>`<li>${x}</li>`).join('')}</ol>${h.tip?`<p>${h.tip}</p>`:''}<p><button type="button" class="linkbtn" data-hide-tips>Hide all tips</button>. Turn them back on under Share and export.</p>`;
+}
+// fill and show or hide every "How to use" box; folded boxes stay folded in this browser
+function renderHowtos(){
+  const st=state.settings, folded=st.foldedTips||[];
+  document.querySelectorAll('.howto[data-howto]').forEach(el=>{
+    const key=el.dataset.howto;
+    if(el.dataset.filled!==key){ el.innerHTML=howtoHtml(key); el.dataset.filled=key; }
+    el.hidden=!!st.hideTips; el.open=!folded.includes(key);
+  });
+  $('tipsToggle').textContent=st.hideTips?'Show how-to tips':'Hide how-to tips';
+}
 function deltaPill(pv,mv){
   if(mv==null) return '<span class="delta eq">Not measured</span>';
   if(pv==null) return '<span class="delta eq">No prediction</span>';
@@ -1364,7 +1468,7 @@ function load(){
   setStatus('Saved automatically in this browser.');
 }
 
-function render(){renderPicker();renderRail();renderStage();renderPanel();renderPipeline();applyScreen()}
+function render(){renderPicker();renderRail();renderStage();renderPanel();renderPipeline();renderHowtos();applyScreen()}
 function fitTitle(){ const t=$('detName'); t.style.height='auto'; t.style.height=t.scrollHeight+'px'; }
 // One page per detection, as HTML for screen and print, and as Markdown for pasting into tickets or meeting notes
 function buildSummary(d){
@@ -1557,6 +1661,19 @@ $('newDet').addEventListener('click',()=>{
 });
 $('backBtn').addEventListener('click',()=>show('overview'));
 $('exToggle').addEventListener('click',()=>{ state.dets.some(d=>d.example)?removeExamples():loadExamples(); });
+function setTips(hide){ state.settings.hideTips=hide; if(!hide) state.settings.foldedTips=[]; renderHowtos(); save(); }
+$('tipsToggle').addEventListener('click',e=>{ setTips(!state.settings.hideTips); e.target.closest('details').open=false; });
+document.addEventListener('click',e=>{ if(e.target.closest('[data-hide-tips]')){ setTips(true); flash('Tips hidden. Turn them back on under Share and export.',5000); } });
+// remember folded how-to boxes and open level lists; toggle does not bubble, so listen in the capture phase
+document.addEventListener('toggle',e=>{
+  const el=e.target;
+  if(el.matches('.howto[data-howto]')&&!el.hidden){
+    const key=el.dataset.howto, f=new Set(state.settings.foldedTips||[]);
+    if(el.open===!f.has(key)) return;
+    el.open?f.delete(key):f.add(key); state.settings.foldedTips=[...f]; save();
+  }
+  if(el.matches('.levels[data-lv]')) el.open?openLevels.add(el.dataset.lv):openLevels.delete(el.dataset.lv);
+},true);
 $('exRemove').addEventListener('click',removeExamples);
 $('summaryBtn').addEventListener('click',()=>show('summary'));
 $('sumBack').addEventListener('click',()=>show('detail'));
