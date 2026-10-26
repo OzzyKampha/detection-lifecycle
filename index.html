@@ -1516,8 +1516,8 @@ function buildSummary(d){
   H.push(`<p class="sum-foot">${esc(foot)}</p>`); M.push(`\n_${foot}_`);
   return {html:H.join(''),md:M.join('\n')};
 }
-// Ten made-up detections that show every part of the tool: each stage, gates, gaps, partial data,
-// a failed prediction, reviews that trigger flags, a parked idea and a deprecated rule.
+// Eleven made-up detections that show every part of the tool: each stage, gates, gaps, partial data,
+// a failed prediction, reviews that trigger flags, a parked idea, a P1 waiting to start and a deprecated rule.
 function exampleSet(){
   const now=Date.now(), iso=(t)=>new Date(t).toISOString(), ago=(n)=>iso(now-n*DAY);
   const P=(a,b,c,d,e,f,g)=>({coverage:a,durability:b,complexity:c,confidence:d,noise:e,action:f,cost:g});
@@ -1572,6 +1572,9 @@ function exampleSet(){
     meta:meta('Threat intel','Jonas',['TA0003'],'T1505.003','Elastic Defend file events'),indicator:'ttp',rule:'https://git.example.com/detections/rules/iis-webshell-write',
     checks:{invest:['partial',true,true,true,true,true,true,true,true],dev:[true,true,false,false,false,false]},
     gapNotes:{0:'Elastic Defend on about 70% of internet-facing IIS servers'}},18,[['req',2],['triage',1],['invest',4]],'dev'));
+  L.push(path({uid:'ex-schtask',name:'Scheduled task created from a temp folder',scores:{prio:P(4,3,4,4,3,3,3),triage:T(3,4,4,4,3)},
+    meta:{...meta('Red or purple team','Sam',['TA0002','TA0003'],'T1053.005','Windows Security 4698, Sysmon'),requestedBy:'Purple team',reference:'PT-2026-09 finding 5: persistence via a scheduled task went unnoticed'},
+    notes:{triage:'P1 on both scores. Work starts when the web shell rule is done.'}},2,[['req',1]],'triage'));
   L.push(path({uid:'ex-ransom',name:'Mass file renames on file shares',scores:{prio:{coverage:3,durability:3,complexity:2},triage:{}},
     meta:{...meta('Incident','Priya',['TA0040'],'T1486','Windows file share auditing'),requestedBy:'Incident response lead, Kari',reference:'TTX-2026-03 finding 4: mass renames on a file share went unnoticed in the ransomware tabletop'},
     notes:{req:'Raised after the ransomware tabletop exercise. Needs volume baselines per share.'}},3,[],'req'));
